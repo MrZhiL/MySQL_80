@@ -95,7 +95,8 @@ ORDER BY sum_sal DESC, last_name ASC;
 # 2. 选择工资不在8000到17000的员工和工资，按工资降序，显示第21到40位置的数据
 SELECT employee_id, last_name, department_id, salary
 FROM employees
-WHERE salary > 17000 || salary < 8000
+#WHERE salary > 17000 || salary < 8000
+WHERE salary BETWEEN 8000 AND 17000
 ORDER BY salary DESC
 LIMIT 20, 20;
 
@@ -104,7 +105,7 @@ SELECT employee_id, last_name, email
 FROM employees
 #WHERE email REGEXP 'e'
 WHERE email like '%e%'
-ORDER BY email DESC, department_id ASC;
+ORDER BY LENGTH(email) DESC, department_id ASC;
 
 
 
