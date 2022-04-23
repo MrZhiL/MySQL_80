@@ -116,6 +116,83 @@ SELECT e1.employee_id, e1.last_name, e2.employee_id, e2.last_name
 FROM employees e1, employees e2 # e1表示员工，e2表示管理者
 WHERE e1.manager_id = e2.employee_id;
 
+# 5.3 内连接 vs 外连接
+# 内连接：合并具有同一列的两个以上的表的行，结果集中不包含一个表与另一个表不匹配的行（上述的测试均为内连接）
+# 内连接测试，因此以下查询只有106条记录
+SELECT emp.employee_id, emp.last_name, dep.department_name
+FROM employees emp, departments dep
+WHERE emp.department_id = dep.department_id 
+ORDER BY emp.employee_id ASC;
+
+# 外连接：合并具有同一列的两个以上的表的行，结果集中除了包含一个表与另一个表不匹配的行（上述的测试均为内连接）
+# 			  还查询到了左表 或 右表 中不匹配的行，则称为外连接
+# 外连接分类：左外连接 、 右外连接、 满外连接
+
+# 练习1：查询所有员工的last_name, department_name信息 
+
+# SQL92语法实现内连接：上述测试就是
+# SQL92语法实现外连接：使用 + 
+# note: MYSQL不支持SQL92语法中外连接的写法！但是Oracle支持
+SELECT emp.employee_id, emp.last_name, dep.department_name
+FROM employees emp, departments dep 
+WHERE emp.department_id = dep.department_id(+)# 此时为左外连接
+WHERE emp.department_id(+) = dep.department_id# 此时为右外连接
+ORDER BY emp.employee_id ASC; 
+
+# SQL99语法中使用JOIN ... ON 的方式实现多表的查询，这种方式也能解决外连接的问题。MySQL支持这种方式的语法
+# SQL99语法实现多表的查询：
+
+# 1): SQL99语法实现内连接查询：(INNER) JOIN ... ON
+# 练习：查询员工的employee_id, last_name, department_name
+SELECT e.employee_id, e.last_name, d.department_name
+FROM employees e 
+JOIN departments d
+ON e.department_id = d.department_id
+ORDER BY e.employee_id ASC; 
+
+# 练习：查询员工的employee_id, last_name, department_name, city
+SELECT emp.employee_id, emp.last_name, dep.department_name, loc.city
+FROM employees emp
+INNER JOIN departments dep
+ON emp.department_id = dep.department_id 
+JOIN locations loc
+ON dep.location_id = loc.location_id
+ORDER BY emp.employee_id ASC;
+
+# 2) SQL99语法实现外连接:OUTER JOIN ... ON
+# 练习：查询所有员工的employee_id, last_name, department_name
+SELECT e.employee_id, e.last_name, d.department_name
+FROM employees e
+# note: 此时需要指明是左外连接还是右外连接，此时OUTER可以省略掉
+-- LEFT OUTER JOIN departments d ON e.department_id = d.department_id
+LEFT JOIN departments d ON e.department_id = d.department_id
+ORDER BY e.employee_id ASC; 
+
+# 右外连接：
+SELECT e.employee_id, e.last_name, d.department_name
+FROM employees e
+# note: 此时需要指明是左外连接还是右外连接，此时OUTER可以省略掉
+-- RIGHT OUTER JOIN departments d ON e.department_id = d.department_id
+RIGHT JOIN departments d ON e.department_id = d.department_id
+ORDER BY e.employee_id ASC; 
+
+
+# 满外连接：mysql不支持FULL OUTER JOIN 方式
+SELECT e.employee_id, e.last_name, d.department_name
+FROM employees e
+# note: 此时需要指明是左外连接还是右外连接，此时OUTER可以省略掉
+FULL OUTER JOIN departments d ON e.department_id = d.department_id
+-- FULL JOIN departments d ON e.department_id = d.department_id
+ORDER BY e.employee_id ASC; 
+
+# mysql中实现满外连接：
+
+
+
+
+
+
+
 
 
 
