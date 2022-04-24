@@ -277,8 +277,38 @@ ON e.department_id = d.department_id
 WHERE e.department_id IS NULL;
 
 
+## 8. SQL99 语法新特性：自然连接 和 USING
+## 8.1 NATURAL JOIN
+#  我们可以把自然连接理解为SQL 92中的等值连接。
+#	 它会帮我们自动查询两张连接表中所有相同的字段，然后进行等值连接
+
+desc departments;
+desc employees;
+
+# SQL 92语法查询
+SELECT e.employee_id, last_name, d.department_name
+FROM employees e JOIN departments d
+ON e.department_id = d.department_id
+AND e.manager_id = d.manager_id;
+
+# SQL 99语法查询: 使用自然连接
+SELECT e.employee_id, e.last_name, d.department_name
+FROM employees e NATURAL JOIN departments d;
 
 
+## 8.2 USING 的使用
+## note: 与自然连接NATURAL JOIN不同的是，USING指定了具体的相同字段的名称，此时
+##  		 只需要在USING的括号()中填入要指定的同名名词。同时使用JOIN ... USING可以简化JOIN ON的等值连接。
 
+# 当我们进行连接的时候，SQL99还支持使用USING指定数据表里的同名字段进行等值连接。
+# 但只能配合JOIN一起使用，比如：
+SELECT e.employee_id, e.last_name, d.department_name
+FROM employees e JOIN departments d
+USING (department_id, manager_id); # 相等于ON e.department_id = d.department_id AND e.manager_id = d.manager_id;
 
+## 8.3 扩展(但是不建议这么写，而是一个JOIN 对应一个 ON)
+SELECT last_name, job_title, department_name
+FROM employees INNER JOIN departments INNER JOIN jobs
+ON employees.department_id = departments.department_id
+AND employees.job_id = jobs.job_id;
 
