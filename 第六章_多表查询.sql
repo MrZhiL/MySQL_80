@@ -185,10 +185,96 @@ FULL OUTER JOIN departments d ON e.department_id = d.department_id
 -- FULL JOIN departments d ON e.department_id = d.department_id
 ORDER BY e.employee_id ASC; 
 
-# mysql中实现满外连接：
+## mysql中实现满外连接：
+
+## 6. UNION and UNION ALL
+## UNION：返回两个查询的结果集的并集，去除重复记录
+## UNION ALL：返回两个查询的结果集的并集。对于两个结果集的重复部分，不去重
+## note: 执行UNILN ALL语句时所需要的资源比UNION语句少。如果明确知道合并数据后
+##			  的结果数据不存在重复元素，或者不需要去除重复数据，则推荐使用UNION ALL，以提高查询的效率
+
+## 6.1 7种JOIN的实现
+# 1) 内连接(使用JOIN ON或者WHERE ... )
+# MySQL99 语法
+SELECT e.employee_id, d.department_name
+FROM employees e JOIN departments d
+ON e.department_id = d.department_id
+ORDER BY e.employee_id ASC;
+
+# MySQL92 语法
+SELECT e.employee_id, d.department_name
+FROM employees e, departments d
+WHERE e.department_id = d.department_id
+ORDER BY e.employee_id ASC;
+
+# 2) 左外连接
+# MySQL99 语法
+SELECT e.employee_id, d.department_name
+FROM employees e LEFT JOIN departments d
+ON e.department_id = d.department_id
+ORDER BY e.employee_id ASC;
+
+# 3) 右外连接
+SELECT e.employee_id, d.department_name
+FROM employees e RIGHT JOIN departments d
+ON e.department_id = d.department_id
+ORDER BY e.employee_id ASC;
+
+# 4) 左外连接（不包括A和B的交集）
+SELECT e.employee_id, d.department_name
+FROM employees e LEFT JOIN departments d
+ON e.department_id = d.department_id
+WHERE d.department_id IS NULL
+ORDER BY e.employee_id ASC;
+
+# 5) 右外连接（不包括A和B的交集）
+SELECT e.employee_id, d.department_name, e.department_id
+FROM employees e RIGHT JOIN departments d
+ON e.department_id = d.department_id
+WHERE e.department_id IS NULL
+ORDER BY e.employee_id ASC;
+
+# 6) 满连接，使用UNION ALL
+# 方式1：左外连接 和 右外连接（不包括A和B的交集）
+SELECT e.employee_id, d.department_name
+FROM employees e LEFT JOIN departments d
+ON e.department_id = d.department_id
+
+UNION ALL
+
+SELECT e.employee_id, d.department_name
+FROM employees e RIGHT JOIN departments d
+ON e.department_id = d.department_id
+WHERE e.department_id IS NULL;
+-- ORDER BY e.employee_id ASC;
+
+# 方式2：使用 左外连接（不包括A和B的交集） 和 右外连接
+SELECT e.employee_id, d.department_name
+FROM employees e LEFT JOIN departments d
+ON e.department_id = d.department_id
+WHERE d.department_id IS NULL
+
+UNION ALL
+
+SELECT e.employee_id, d.department_name
+FROM employees e RIGHT JOIN departments d
+ON e.department_id = d.department_id;
 
 
 
+# 7) 满连接（去除A和B的交集）: 均需要两个连接中有相同的columns，否则会报错
+# 使用：左外连接（不包括A和B的交集） UNION ALL 右外连接（不包括A和B的交集）
+SELECT e.employee_id, d.department_name
+FROM employees e LEFT JOIN departments d
+ON e.department_id = d.department_id
+WHERE d.department_id IS NULL
+
+UNION ALL
+
+SELECT e.employee_id, d.department_name
+FROM employees e RIGHT JOIN departments d
+ON e.department_id = d.department_id
+WHERE e.department_id IS NULL;
 
 
 
