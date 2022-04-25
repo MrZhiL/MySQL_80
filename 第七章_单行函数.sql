@@ -480,3 +480,82 @@ FROM employees
 WHERE department_id IN (10, 20, 30);
 
 
+## 五、加密和解码函数
+/*
+	加密与解密主要用于对数据库中的数据进行加密和解密处理，以防止数据被他人窃取。这些函数在保证数据库安全时非常有用。
+
+	函数			用法
+	PASSWORD(str)	返回字符串str的加密版本，41位长的字符串。加密结果不可逆，常用于用户的密码加密
+	MD5(str)	返回字符串str的md5加密后的值，也是一种加密方式。若参数为NULL，则会返回NULL
+	SHA(str)	从原明文密码str计算并返回加密后的密码字符串，当参数为NULL时，返回NULL。SHA加密算法比MD5更加安全。
+	ENCODE(value,password_seed) 返回使用password_seed作为加密密码加密value
+	DECODE(value,password_seed) 返回使用password_seed作为加密密码解密value
+ */
+
+# `PASSWORD`(str), 在MySQL5.7中：
+mysql> SELECT PASSWORD('mysql');
++-------------------------------------------+
+| PASSWORD('mysql')                         |
++-------------------------------------------+
+| *E74858DB86EBA20BC33D0AECAE8A8108C56B17FA |
++-------------------------------------------+
+1 row in set, 1 warning (0.00 sec)
+
+# PASSWORD(str) : 在mysql8.0中已经被弃用
+
+# MD5(str), 不可逆的加密方式
+SELECT MD5('mysql'), SHA('mysql'),
+LENGTH('81c3b080dad537de7e10e0987a4bf52e'), LENGTH('f460c882a18c1304d88854e902e11b85d71e7e1b')
+FROM DUAL;
+
+# ENCODE(str,pass_str), DECODE(crypt_str,pass_str) 在mysql8.0中被弃用
+SELECT ENCODE('mysql', 'zhileixin')
+FROM DUAL;
+
+# ENCODE(str,pass_str), DECODE(crypt_str,pass_str) 在5.7数据库中的操作
+mysql> SELECT ENCODE('mysql', 'zhileixin');
++------------------------------------------------------------+
+| ENCODE('mysql', 'zhileixin')                               |
++------------------------------------------------------------+
+| 0x1599CBF113                                               |
++------------------------------------------------------------+
+1 row in set, 1 warning (0.00 sec)
+
+mysql> SELECT DECODE('mysql','zhileixin');
++----------------------------------------------------------+
+| DECODE('mysql','zhileixin')                              |
++----------------------------------------------------------+
+| 0xAFFA323196                                             |
++----------------------------------------------------------+
+1 row in set, 1 warning (0.00 sec)
+
+# 在mysql的图形界面中可以正常显示
+mysql> SELECT DECODE(ENCODE('mysql', 'zhileixin'), 'zhileixin')
+    -> FROM DUAL;
++------------------------------------------------------------------------------------------------------+
+| DECODE(ENCODE('mysql', 'zhileixin'), 'zhileixin')                                                    |
++------------------------------------------------------------------------------------------------------+
+| 0x6D7973716C                                                                                         |
++------------------------------------------------------------------------------------------------------+
+1 row in set, 2 warnings (0.00 sec)
+
+
+## 六、MySQL信息函数
+/*
+		MySql中内置了一些可以查询MySQL信息的函数，这些函数主要用于帮助数据库开发或者运维人员更好地对数据库进行维护操作
+
+	函数			用法
+	VERSION() 返回当前MySQL的版本号
+	CONNECTION_ID() 返回当前MySQL服务器的连接数
+	DATABASE()，SCHEMA() 返回MySQL命令行当前所在的数据库
+	USER()，CURRENT_USER()、SYSTEM_USER()，SESSION_USER() 	返回当前连接MySQL的用户名，返回结果格式为“主机名@用户名”
+	CHARSET(value) 返回字符串value自变量的字符集
+	COLLATION(value) 返回字符串value的比较规则
+ */
+
+SELECT VERSION(), CONNECTION_ID(), DATABASE(), SCHEMA(), USER(), CURRENT_USER(), CHARSET('数据库'), COLLATION('数据库')
+FROM DUAL;
+
+
+
+
