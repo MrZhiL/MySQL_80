@@ -557,5 +557,38 @@ SELECT VERSION(), CONNECTION_ID(), DATABASE(), SCHEMA(), USER(), CURRENT_USER(),
 FROM DUAL;
 
 
+## 六、其他函数
+/*
+	FORMAT(value,n) 返回对数字value进行格式化后的结果数据。n表示四舍五入后保留到小数点后n位
+	CONV(value,from,to) 将value的值进行不同进制之间的转换
+	INET_ATON(ipvalue) 将以点分隔的IP地址转化为一个数字
+	INET_NTOA(value) 将数字形式的IP地址转化为以点分隔的IP地址
+	BENCHMARK(n,expr) 将表达式expr重复执行n次。用于测试MySQL处理expr表达式所耗费的时间
+	CONVERT(value USING char_code)将value所使用的字符编码修改为char_code
+ */
+
+# FORMAT相当于四舍五入要保存的位数
+SELECT FORMAT('123.123123', 2), FORMAT(123.126123, 2)
+FROM DUAL;
+
+# CONV(N,from_base,to_base)
+SELECT CONV(16, 10, 2), CONV(8888, 10, 16), CONV(NULL, 10, 2), CONV(1111, 2, 10), CONV(17, 8, 10), CONV('ABC', 36, 10)
+FROM DUAL;
+
+# INET_ATON, INET_NTOA
+# # 以“192.168.1.100”为例，计算方式为192乘以256的3次方，加上168乘以256的2次方，加上1乘以256，再加上100。
+SELECT INET_ATON('192.168.0.101'), INET_NTOA(3232235621)
+FROM DUAl;
+
+# BENCHMARK()用于测试表达式的执行效率
+SELECT BENCHMARK(100000, MD5('mysql12314'))
+FROM DUAL;
+
+# CONVERT(vaule USING char_code)： 将value所使用的字符编码修改为char_code
+SELECT CHARSET('helloworld'), CHARSET(CONVERT('helloworld' USING 'utf8mb3')), CHARSET(CONVERT('helloworld' USING 'gbk'))
+FROM DUAL;
+
+
+
 
 
