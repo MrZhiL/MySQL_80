@@ -413,3 +413,70 @@ SELECT GET_FORMAT(DATE, 'USA'), GET_FORMAT(DATE, 'ISO'),
 DATE_FORMAT(CURDATE(), GET_FORMAT(DATE, 'USA'))
 FROM DUAL;
 
+
+## 四、流程控制函数
+/*
+  流程控制函数可以根据不同的条件，执行不同的处理流程，可以在SQL语句中实现不同的条件选择。
+	MySQL流程处理函数主要包括IF(), IFNULL() 和 CASE() 函数
+
+	函数															用法
+	IF(value,value1,value2)						如果value的值为TRUE，返回value1，否则返回value2
+	IFNULL(value1, value2)						如果value1不为NULL，返回value1，否则返回value2
+	CASE WHEN 条件1 THEN 结果1 WHEN 条件2 THEN 结果2	.... [ELSE resultn] END    :相当于Java的if...else if...else...
+	
+	CASE expr WHEN 常量值1 THEN 值1 WHEN 常量值1 THEN	值1 .... [ELSE 值n] END	   :相当于Java的switch...case...
+ */
+
+SELECT IF(1 > 0, 'true', 'false'),
+IFNULL(1, 2), IFNULL(NULL, 0)
+FROM DUAL;
+
+SELECT last_name, salary, IF(salary >= 6000, 'high salary', 'low salary') details
+FROM employees;
+
+
+SELECT last_name, commission_pct, IFNULL(commission_pct, 0) details,
+salary * 12 * (1 + IFNULL(commission_pct,0)) 'annual_sal'
+FROM employees;
+
+# CASE WHEN ... THEN ... WHEN ... THEN ... END
+SELECT last_name, salary, CASE WHEN salary >= 15000 THEN 'high salary'
+															 WHEN salary >= 10000 THEN 'middle salary'
+															 WHEN salary >= 8000  THEN 'low-middle salary'
+															 ELSE 'low salary' END "salary details"
+FROM employees;
+
+# 可以省略掉ELSE ..., 此时ELSE中存在的数据会返回NULL
+SELECT last_name, salary, CASE WHEN salary >= 15000 THEN 'high salary'
+															 WHEN salary >= 10000 THEN 'middle salary'
+															 WHEN salary >= 8000  THEN 'low-middle salary'
+															 END "salary details"
+FROM employees;
+
+# CASE expr WHEN ... THEN ... WHEN ... THEN ... END
+SELECT e.last_name, e.department_id, CASE e.department_id WHEN 30 THEN CONCAT(d.department_name, 1)
+																 WHEN 50 THEN CONCAT(d.department_name, 2)
+																 WHEN 60 THEN CONCAT(d.department_name, 3)
+																 WHEN 90 THEN CONCAT(d.department_name, 4)
+																 WHEN 100 THEN CONCAT(d.department_name, 5)
+																 ELSE d.department_name END 'department_name'
+FROM employees e LEFT JOIN departments d
+USING (department_id);
+
+# 练习：查询部门号为 10,20, 30 的员工信息, 若部门号为 10, 则打印其工资的 1.1 倍, 20 号部门, 则打印其
+#       工资的 1.2 倍, 30 号部门打印其工资的 1.3 倍数。其他部门打印原本工资
+SELECT last_name, department_id, salary, CASE department_id WHEN 10 THEN salary*1.1
+																										WHEN 20 THEN salary*1.2
+																										WHEN 30 THEN salary*1.3
+																										ELSE salary	END 'salary'
+FROM employees;
+
+# 优化
+SELECT last_name, department_id, salary, CASE department_id WHEN 10 THEN salary*1.1
+																										WHEN 20 THEN salary*1.2
+																										WHEN 30 THEN salary*1.3
+																										END 'salary'
+FROM employees
+WHERE department_id IN (10, 20, 30);
+
+
