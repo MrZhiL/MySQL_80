@@ -235,13 +235,105 @@ WHERE salary = (
 
 
 ## 5. 多行子查询
+/*
+	多行子查询也称为比较子查询
+
+	内查询返回多行
+
+	使用多行比较操作符：
+
+	多行比较操作符		含义
+	IN 								等于列表中的任意一个
+	ANY 							需要和单行比较操作符一起使用，和子查询返回的某一个值比较
+	ALL 							需要和单行比较操作符一起使用，和子查询返回的所有值比较
+	SOME 							实际上是ANY的别名，作用相同，一般常使用ANY
+ */
+
+## 代码示例：
+# 题目5-1：返回其他job_id中比job_id为'IT_PROG'部门 **任一** 工资低的员工的员工号、姓名、job_id以及salary
+# note: 在该题目中，只要比任何一个工资低就可以查询到（相当于小于最高工资即可）
+# 方法1：
+SELECT employee_id, last_name, job_id, salary
+FROM employees
+WHERE job_id != 'IT_PROG' AND salary < ANY(
+			SELECT salary
+			FROM employees
+			WHERE job_id = 'IT_PROG'
+);
+
+# 方法2：使用最高工资查询
+SELECT employee_id, last_name, job_id, salary
+FROM employees
+WHERE job_id != 'IT_PROG' AND salary < (
+			SELECT MAX(salary)
+			FROM employees
+			WHERE job_id = 'IT_PROG'
+);
 
 
+## 代码示例：
+# 题目5-2：返回其他job_id中比job_id为'IT_PROG'部门 **所有** 工资低的员工的员工号、姓名、job_id以及salary
+# note: 在该题目中，只要比任何一个工资低就可以查询到（相当于小于最低工资即可）
+# 方法1：
+SELECT employee_id, last_name, job_id, salary
+FROM employees
+WHERE job_id != 'IT_PROG' AND salary < ALL(
+			SELECT salary
+			FROM employees
+			WHERE job_id = 'IT_PROG'
+);
+
+# 方法2：使用最低工资查询
+SELECT employee_id, last_name, job_id, salary
+FROM employees
+WHERE job_id != 'IT_PROG' AND salary < (
+			SELECT MIN(salary)
+			FROM employees
+			WHERE job_id = 'IT_PROG'
+);
 
 
+# 题目5-3：查询平均工资最低的部门id
+# 方法1：
+SELECT department_id, AVG(salary)
+FROM employees
+WHERE department_id IS NOT NULL 
+GROUP BY department_id
+HAVING AVG(salary) <= ALL (
+			SELECT AVG(salary)
+			FROM employees
+			GROUP BY department_id
+);
 
+# 方法2：将查询到的每个部门的平均工资当成一个新表
+SELECT department_id, AVG(salary)
+FROM employees
+GROUP BY department_id
+HAVING AVG(salary) = (
+			SELECT MIN(avg_sal)
+			FROM (SELECT department_id dep_id, AVG(salary) avg_sal
+						FROM employees
+						WHERE department_id IS NOT NULL
+						GROUP BY department_id
+					 ) dept_avg_sal
+);
 
+# 5-6 空值问题
+SELECT last_name, manager_id
+FROM employees
+WHERE employee_id NOT IN (
+			SELECT manager_id
+			FROM employees
+			-- WHERE manager_id IS NOT NULL # 如果不对null值进行去除，则会导致结果中包含null，从而使得所有结果为null
+);
 
+SELECT last_name, manager_id
+FROM employees
+WHERE employee_id NOT IN (
+			SELECT manager_id
+			FROM employees
+			WHERE manager_id IS NOT NULL
+);
 
 
 
