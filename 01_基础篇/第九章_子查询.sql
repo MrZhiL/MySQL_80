@@ -34,6 +34,18 @@ WHERE salary > (
 		WHERE last_name = 'Abel'
 );
 
+### 结论：
+/* 以上的方式2和方式3两种查询方式那个更好：
+	
+	 答：自连接的方式更好！
+			 该题目中可以使用子查询，也可以使用自连接。一般情况下建议使用自连接，
+		   因为在许多DBMS的处理过程中，对于自连接的处理速度要比子查询快得多。
+
+			 可以这样理解：子查询实际上是通过未知表进行查询后的条件判断，而自连接
+		   是通过已知的自身数据表进行条件判断，因此在大部分DBMS中都对自连接处理进行了优化。
+		
+
+ */
 
 
 ## 2. 称谓的规范：外查询（或主查询）、内查询（或子查询）
@@ -334,6 +346,122 @@ WHERE employee_id NOT IN (
 			FROM employees
 			WHERE manager_id IS NOT NULL
 );
+
+
+## 6. 相关子查询（子查询中使用主查询中的列）
+/* 相关子查询的执行流程：
+	
+	 如果子查询的执行依赖于外部查询，通常情况下都是因为子查询中的表用到了外部的表，并进行了条件关联，
+	 因此每执行一次外部查询，子查询都要重新计算一次，这样的子查询就称之为 `关联子查询`
+
+	 相关子查询按照一行接一行的顺序执行，主查询的每一行都执行一次子查询。
+
+
+	 结论：在SELECT中，除了GROUP BY 和 LIMIT 之外，其他位置都可以声明子查询
+ */
+
+## 6.1 代码示例：
+# 题目6-1：查询员工中工资大于本部门平均工资的员工的last_name和其department_id
+# 方式一：相关子查询
+SELECT last_name, department_id, salary
+FROM employees e1
+WHERE salary > (
+		SELECT AVG(salary)
+		FROM employees
+		WHERE department_id = e1.department_id
+);
+
+# 方式二：在FROM中声明子查询
+SELECT e1.last_name, e1.department_id, e1.salary
+FROM employees e1, (
+										SELECT department_id, AVG(salary) avg_sal
+										FROM employees
+										GROUP BY department_id
+									 ) tmp	
+WHERE e1.department_id = tmp.department_id
+AND e1.salary > tmp.avg_sal;
+
+# 题目6-2：查询员工的id, salary, 按照department_name排序
+SELECT employee_id, salary
+FROM employees e
+ORDER BY (
+	SELECT department_name
+	FROM departments d
+	WHERE e.department_id = d.department_id
+) ASC;
+
+
+# 题目6-3：若employees表中employee_id与job_history表中employee_id相同的数目不小于2，输出这些相同
+#					 id的员工的employee_id,last_name和其job_id 
+# 方式1：使用相关子查询
+SELECT e1.employee_id, e1.last_name, e1.job_id
+FROM employees e1
+WHERE 2 <= (
+				SELECT count(employee_id )
+				FROM job_history
+				WHERE employee_id = e1.employee_id
+);
+
+
+## 6.2 EXISTS 与 NOT EXISTS 关键字
+/* 关联子查询通常也会和EXISTS操作符一起来使用，用来检查在子查询中是否存在满足条件的行
+	 
+	 如果在子查询中不存在满足条件的行：条件返回FALSE；继续在子查询中查找
+
+	 如果在子查询中存在满足条件的行：不再子查询中继续查找；条件返回TRUE
+
+	 NOT EXISTS 关键字表示如果不存在某种条件，则返回TRUE，否则返回FALSE
+ */
+# 题目6-2-1：查询公司管理者的employee_id，last_name, job_id,  department_id
+# 方式1：直接使用子查询进行查询
+SELECT e1.employee_id, e1.last_name, e1.job_id, e1.department_id
+FROM employees e1
+WHERE e1.employee_id IN (
+				SELECT DISTINCT manager_id
+				FROM employees
+				WHERE manager_id IS NOT NULL
+			);
+
+# 方式2：使用自连接
+SELECT DISTINCT e2.employee_id, e2.last_name, e2.job_id, e2.department_id
+FROM employees e1 JOIN employees e2
+ON e1.manager_id = e2.employee_id;
+
+# 方式3：使用EXISTS
+SELECT e1.employee_id, e1.last_name, e1.job_id, e1.department_id
+FROM employees e1
+WHERE EXISTS (
+				SELECT *
+				FROM employees e2
+				WHERE e1.employee_id = e2.manager_id
+			);
+
+
+# 题目6-2-2：查询departments表中，不存在于employees表中的部门的department_id和department_name
+# 方式1：使用NOT EXISTS
+SELECT department_id, department_name
+FROM departments d
+WHERE NOT EXISTS (
+			SELECT *
+			FROM employees e
+			WHERE d.department_id = e.department_id
+);
+
+# 方式2：使用子查询
+SELECT department_id, department_name
+FROM departments d 
+WHERE d.department_id NOT IN (
+			SELECT DISTINCT department_id
+			FROM employees
+			WHERE department_id IS NOT NULL
+);
+
+# 方式3：使用右外连接
+SELECT d.department_id, d.department_name
+FROM departments d LEFT JOIN employees e
+ON d.department_id = e.department_id
+WHERE e.department_id IS NULL;
+
 
 
 
