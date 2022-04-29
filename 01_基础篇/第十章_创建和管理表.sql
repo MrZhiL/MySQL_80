@@ -72,17 +72,86 @@ SHOW DATABASES;
 
 
 ## 2.创建表
+/* 创建方式一：
+	 
+	 必须具备：CREATE TABLE 权限；存储空间
+	 语法格式：
+						CREATE TABLE [IF NOT EXISTS] 表明(
+							字段1, 数据类型 [约束条件] [默认值],
+							字段2, 数据类型 [约束条件] [默认值],
+							字段3, 数据类型 [约束条件] [默认值],
+						  ...
+						  [表约束条件]
+				    );
+ */ 
+USE dbtest2; # 该数据库中默认使用的是UTF-8
+SHOW CREATE DATABASE dbtest2;
+
+# 如果创建表示没有指明使用的字符集，则默认使用表所在的数据库的字符集
+CREATE TABLE IF NOT EXISTS myemp1(
+		id INT,
+		emp_name VARCHAR(15), # 使用VARCHAR来定义字符串，必须在使用VARCHAR时指明其长度
+		hire_data DATE
+);
+
+# 查看表结构
+DESC myemp1;
+
+# 查看数据库中表的创建信息
+SHOW CREATE TABLE myemp1;
+
+# 查看表中的数据
+SELECT * FROM myemp1;
+
+/* 创建表的 方式2：基于现有的表 
+	 此时会将现有的表中的数据复制到新创建的表中
+ */
+CREATE TABLE myemp2 
+AS 
+SELECT employee_id, last_name, salary
+FROM employees
+
+DESC myemp2;
+SHOW CREATE TABLE myemp2;
+SELECT * FROM myemp2;
+
+# 说明1：查询语句中字段的别名，可以作为新创建的表的字段的名称
+# 说明2：此时的查询语句可以结构比较丰富，使用前面章节中讲过的SELECT语句
+CREATE TABLE myemp3
+AS 
+SELECT e.employee_id emp_id, e.last_name lname, e.department_id, d.department_name
+FROM employees e JOIN departments d
+USING (department_id)
+
+DESC myemp3;
+SELECT * FROM myemp3;
+
+# 练习1：创建一个表employees_copy，实现对employees表的复制，包括表数据
+CREATE TABLE employees_copy
+AS 
+SELECT * FROM employees;
+
+SELECT * FROM employees_copy;
+
+# 练习2：创建一个表employees_blank，实现对employees表的复制，不包括表数据
+# 此时只需要通过过滤条件查询出没有数据的表即可
+CREATE TABLE employees_blank
+AS 
+SELECT * FROM employees
+-- WHERE employee_id IS NULL;
+WHERE 1 = 2;
+
+SELECT * FROM employees_blank;
 
 
-## 3 创建表
+## 3 修改表
 
-## 4 修改表
 
-## 5. 重命名表
+## 4. 重命名表
 
-## 6. 删除表
+## 5. 删除表
 
-## 7. 清空表 
+## 6. 清空表 
 
 
 
