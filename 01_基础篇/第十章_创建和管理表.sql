@@ -169,8 +169,22 @@ CHANGE email e_mail VARCHAR(50) DEFAULT 'xxx@xxx.email';
 
 # 3.4 删除一个字段
 DESC myemp1;
+SELECT * FROM myemp1;
 ALTER TABLE myemp1 DROP e_mail;
 DESC myemp1;
+
+CREATE TABLE myemp4
+AS 
+SELECT e.employee_id emp_id, e.last_name lname, e.department_id, d.department_name
+FROM employees e JOIN departments d
+USING (department_id);
+
+SELECT * FROM myemp4;
+# 删除myemp4中的department_id字段
+ALTER TABLE myemp4 DROP department_id;
+SELECT * FROM myemp4;
+DESC myemp4;
+ROLLBACK; # 通过ALTER修改之后的数据不可以回滚，调用该语句后删除的department_id数据没有回复
 
 ## 4. 重命名表
 # 方式一：使用RENAME
@@ -182,6 +196,7 @@ ALTER TABLE myemp RENAME To myemp1;
 ## 注意：删除表不能回滚
 ## 此时不只将表结构删除掉，同时删除表中的数据，释放表空间
 DROP TABLE IF EXISTS myemp3;
+DROP TABLE IF EXISTS myemp3;
 
 ## 6. 清空表 
 # TRUNCATE TABLE 语句：删除表中所有的数据；释放表的存储空间，但是保留了表结构
@@ -191,6 +206,82 @@ SELECT * FROM employees_copy;
 TRUNCATE TABLE employees_copy;
 SELECT * FROM employees_copy;
 DESC employees_copy;
+
+
+## 7. DCL中的 COMMIT 和 ROLLBACK 的使用
+# COMMIT：提交数据。一旦执行COMMIT，则数据就永久的保存在了数据库中，意味着数据不可以回滚。
+# ROLLBACK：回滚数据。一旦执行ROLLBACK，则可以实现数据的回滚。回滚到最近的一次COMMIT之后。
+
+
+## 8. 对比 TRUNCATE TABLE 和 DELETE FROM
+# 相同点：都可以实现对表中所有数据的删除，同时保留表结构
+# 不同点：
+#				   TRUNCATE TABLE，一旦执行此操作，表数据全部清楚。同时，该数据是 不可以 回滚的。
+#				   DELETE FROM，一旦执行此操作，表数据可以清楚（不带WHERE则全部清楚）。同时，该数据是 可以 实现回滚的。
+
+/*
+ 9. DDL 和 DML 
+	
+	1) DDL的操作一旦执行,就不可以回滚。SET autocommit = FALSE对DDL操作失效
+		 因为在执行完DDL操作之后，一定会执行一次COMMIT。而此COMMIT操作不受SET autocommit = FLASE 影响。
+	
+	2) DML的操作默认情况,一旦执行,也是不可以回滚的。
+		 但是，如果在执行DML之前，执行了SET autocommit = FALSE, 则执行的DML操作就可以回滚
+
+	DDL（Data Definition Languages、数据定义语言），这些语句定义了不同的数据库、表、视图、索引等数据库对象，还可以用来创建、删除、修改数据库和数据表的结构。
+	主要的语句关键字包括CREATE 、DROP 、ALTER 等。
+
+	DML（Data Manipulation Language、数据操作语言），用于添加、删除、更新和查询数据库记录，并检查数据完整性。
+	主要的语句关键字包括INSERT 、DELETE 、UPDATE 、SELECT 等。SELECT是SQL语言的基础，最为重要。
+
+	DCL（Data Control Language、数据控制语言），用于定义数据库、表、字段、用户的访问权限和安全级别。
+	主要的语句关键字包括GRANT 、REVOKE 、COMMIT 、ROLLBACK 、SAVEPOINT 等。
+ */
+# 演示：DELETE FROM
+# 1)
+COMMIT;
+# 2)
+DROP TABLE myemp3;
+# 3)
+CREATE TABLE myemp3
+AS 
+SELECT e.employee_id emp_id, e.last_name lname, e.department_id, d.department_name
+FROM employees e JOIN departments d
+USING (department_id);
+# 4)
+SELECT * FROM myemp3;
+# 5)
+SET autocommit = FALSE; # 如果想要回滚成功，则需要将autocommit 设置为 FALSE
+# 6)
+DELETE FROM myemp3;
+# 7) 通过ROLLBACK回滚数据
+ROLLBACK; # 此时可以将数据恢复
+# 8)
+SELECT * FROM myemp3; 
+
+# 演示：TRUNCATE TABLE
+# 1)
+COMMIT;
+# 2)
+DROP TABLE myemp3;
+# 3)
+CREATE TABLE myemp3
+AS 
+SELECT e.employee_id emp_id, e.last_name lname, e.department_id, d.department_name
+FROM employees e JOIN departments d
+USING (department_id);
+# 4)
+SELECT * FROM myemp3;
+# 5)
+SET autocommit = FALSE;
+# 6)
+TRUNCATE TABLE myemp3;
+# 7) 通过ROLLBACK回滚数据
+ROLLBACK;
+# 8)
+SELECT * FROM myemp3; # 此时的数据为null
+
+
 
 
 
