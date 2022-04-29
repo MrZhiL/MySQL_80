@@ -58,7 +58,7 @@ ALTER DATABASE mytest3 CHARACTER SET 'gbk';
 SHOW CREATE DATABASE mytest2;
 SHOW CREATE DATABASE mytest3;
 
-# 1.4 删除数据库
+# 1.4 删除数据库(注意：删除数据库不能回滚)
 # 方式1：DROP DATABASE 数据库名
 CREATE DATABASE IF NOT EXISTS mytest3;
 SHOW DATABASES;
@@ -144,16 +144,53 @@ WHERE 1 = 2;
 SELECT * FROM employees_blank;
 
 
-## 3 修改表
+## 3 修改表 --> ALTER TABLE 
+# 3.1 添加一个字段, 默认添加到表中的最后一个字段的位置
+# ALTER TABLE 表名 [COLUMN] 字段名 字段类型 [FIRST|AFTER 字段名]；
+DESC myemp1;
+ALTER TABLE myemp1 ADD salary DOUBLE(10, 2);
+ALTER TABLE myemp1 ADD phone_number VARCHAR(20) FIRST;
+ALTER TABLE myemp1 ADD email VARCHAR(45) AFTER emp_name;
+DESC myemp1;
 
+# 3.2 修改一个字段：数据类型、长度、默认值
+ALTER TABLE myemp1 
+MODIFY emp_name VARCHAR(20);
+
+ALTER TABLE myemp1 
+MODIFY emp_name VARCHAR(30) DEFAULT 'hhh';
+
+# 3.3 重命名一个字段（此时可以同时修改数据类型）
+ALTER TABLE myemp1
+CHANGE salary month_salary DOUBLE(10, 3);
+
+ALTER TABLE myemp1
+CHANGE email e_mail VARCHAR(50) DEFAULT 'xxx@xxx.email';
+
+# 3.4 删除一个字段
+DESC myemp1;
+ALTER TABLE myemp1 DROP e_mail;
+DESC myemp1;
 
 ## 4. 重命名表
+# 方式一：使用RENAME
+# 方式二：ALTER TABLE dept RENAME [To] detail_dept; -- [T]可以省略
+RENAME TABLE myemp1 To myemp;
+ALTER TABLE myemp RENAME To myemp1;
 
 ## 5. 删除表
+## 注意：删除表不能回滚
+## 此时不只将表结构删除掉，同时删除表中的数据，释放表空间
+DROP TABLE IF EXISTS myemp3;
 
 ## 6. 清空表 
-
-
+# TRUNCATE TABLE 语句：删除表中所有的数据；释放表的存储空间，但是保留了表结构
+# 举例：TRUNCATE TABLE detail_dept;
+# note: TRUNCATE语句不能回滚，而使用DELETE语句删除数据，可以回滚
+SELECT * FROM employees_copy;
+TRUNCATE TABLE employees_copy;
+SELECT * FROM employees_copy;
+DESC employees_copy;
 
 
 
