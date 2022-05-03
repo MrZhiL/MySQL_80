@@ -93,10 +93,12 @@ DESC employees;
 
 
 ## 2. 更新数据(修改数据)
+## note: 修改数据时，是可能存在不成功的情况的，可能是由于约束的影响造成的。
 /* 1) 基本语法：
 						UPDATE table_name
 						SET column1=value1, column2=vaule2, ..., column=valuen
 						[WHERE condition]
+			可以实现批量修改数据(只要不使用WHERE过滤即可)
 
 	 2) 可以一次更新多条数据
 
@@ -108,22 +110,72 @@ DESC employees;
 						WHERE employee_id = 113;
  */
 
+UPDATE myemp5 SET hire_date = CURDATE()
+WHERE id = 1003; # 如果不指明约束条件，则会将表中的该字段的全部内容进行覆盖
+
+UPDATE myemp5 SET hire_date = CURDATE(), salary = 6000
+WHERE id = 1003; # 如果不指明约束条件，则会将表中的该字段的全部内容进行覆盖
+
+SELECT * FROM myemp5;
+
+# 题目：将表中姓名中包含字符a的salary提高20%
+UPDATE myemp5 SET salary = salary*1.2
+WHERE name LIKE '%a%';
+
+SELECT * FROM employees WHERE employee_id = 102;
+
+# 下面的修改操作将会失败，因为部门表里面没有10000的部门编号
+UPDATE employees 
+SET department_id = 10000 
+WHERE employee_id = 102;
 
 ## 3. 删除数据
+## 		DELETE FROM ... WHERE ...ALTER
+
+SELECT * FROM myemp5;
+
+DELETE FROM myemp5 WHERE id = 1006;
+DELETE FROM myemp5 WHERE id = 102; # 如果数据表中不存在要删除的元素，则不会报错，而是直接结束运行
+DELETE FROM myemp5 WHERE id IN (103, 104);
+
+# 以下的命令会删除失败，因为会受到其他表中的约束
+DELETE FROM departments WHERE department_id = 50; 
+
+# 将SET AUTOCOMMIT = FALSE之后，可以进行数据的回滚
+SET AUTOCOMMIT = FALSE;
+ROLLBACK;
+
+## 小节：DML操作的默认情况下，执行完之后都会自动提交数据。
+##       如果希望执行完以后不自动提交数据，则需要使用SET AUTOCOMMIT = FALSE。
 
 
 ## 4. MySQL8新特性：计算列
+/* 什么叫计算列呢？
+	 
+	 简单来说就是某一列的值通过别的列计算得来的。例如，a列值为1，b列值为2，c列不需要手动插入，
+	 定义 a + b 的结果为c的值，那么c就是计算列，是通过别的列计算得来的。
 
+	 在MySQL8.0中，CREATE TABLE和ALTER TABLE中都支持增加计算列。下面以CREATE TABLE为例进行讲解。
+
+	 举例：定义数据表tb1，然后定义字段id, 字段a, 字段b和字段c，其中字段c为计算列，用于计算a+b的值。
+ */
+USE dbtest2;
+
+CREATE TABLE IF NOT EXISTS tb1(
+		id INT,
+		a INT,
+		b INT,
+		c INT GENERATED ALWAYS AS (a + b) VIRTUAL # 该字段c即为计算列
+);
+
+DESC tb1;
+SELECT * from tb1;
+
+INSERT INTO tb1(a, b) VALUES (10, 20);
+
+UPDATE tb1 SET a = 100;
 
 ## 5. 综合案例
-
-
-
-
-
-
-
-
 
 
 
