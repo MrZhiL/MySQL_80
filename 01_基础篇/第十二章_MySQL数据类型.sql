@@ -352,3 +352,110 @@ SELECT BIN(f1), BIN(f2), BIN(f3), HEX(f1), HEX(f2), HEX(f3), FROM test_bit1;
 
 # 显示十进制：通过加0，可以以十进制的方式显示数据
 SELECT f1 + 0, f2 + 0, f3 + 0 FROM test_bit1;
+
+
+
+
+## 6. 日期和时间类型
+/* 
+	 日期和时间是重要的信息，在我们的系统中，几乎所有的数据表都用得到。原因是客户需要知道数据的时间标签，从而数据查询、统计和处理。
+	
+	 MySQL有多种表示日期和时间的数据类型，不同的版本可能有所差异，MySQL8.0版本支持的日期和时间类型主要有：
+	 YEAR类型、TIME类型、DATE类型、DATETIIME类型和TIMESTAMP类型。 
+
+	 YEAR类型通常用来表示年，
+	 DATE类型通常用来表示年、月、日
+	 TIME类型通常用来表示时、分、秒
+	 DATETIME类型通常用来表示年、月、日、时、分、秒
+	 TIMESTAMP类型通常用来表示带有时区的年、月、日、时、分、秒
+*/
+
+/* 6.1. YEAR类型
+
+	 YEAR类型用来表示年份(范围：1901-2155)，在所有的日期时间类型中所占用的存储空间最小，只需要一个字节的存储空间。
+
+	 从MySQL5.5.27开始，2位格式的YEAR以及不推荐使用。YEAR默认格式就是“YYYY”，没必要写成YEAR(4)，
+	 从MySQL8.0.19开始，不推荐使用指定显示宽度的YEAR(4)数据类型。
+
+	 YEAR中建议还是使用单引号来包裹年份，并使用4位数来表示
+ */
+CREATE TABLE test_year(
+	f1 YEAR,   # 默认为4位
+	f2 YEAR(4)
+);
+
+DESC test_year;
+
+INSERT INTO test_year VALUES('2021', 2022);
+INSERT INTO test_year VALUES('1901', 2155);
+INSERT INTO test_year VALUES('1900', 2155); # [Err] 1264 - Out of range value for column 'f1' at row 1
+INSERT INTO test_year VALUES('1901', 2156); # [Err] 1264 - Out of range value for column 'f2' at row 1
+
+SELECT * FROM test_year;
+
+
+INSERT INTO test_year VALUES('69', '70'); # 2069， 1970
+INSERT INTO test_year VALUES('00', 0); # 2000 0
+INSERT INTO test_year VALUES('0', 00); # 2000 0
+
+/* 6.2. DATE类型
+	 DATE类型表示日期，没有时间部分，格式为“YYYY-MM-DD”，其中YYYY表示年份，MM表示月份，DD表示日期。
+	 需要三个字节的存储空间。在向DATE类型的字段插入数据时，同样需要满足一定的格式条件。
+
+	 以YYYY-MM-DD格式或者YYYYMMDD格式表示字符串日期，其最小取值为1000-01-01，最大取值为9999=12-03。
+	 YYYYMMDD格式会被转化为YYYY-MM-DD格式。
+
+	 以YY-MM-DD格式或者YYYYMMDD表示的字符串日期，此格式中，年份为两位数值或字符串满足YEAR类型的格式条件为：
+	 当年份取值为00到69时，会被转化为2000到2069,；当年份为70到99时，会被转化为1970到1999.ALTER
+	
+	 使用CURRENT_DATE()或者NOW()函数式，会插入当前系统的日期。
+ */
+# 创建数据表，表中只包含一个DATE类型的字段f1.
+CREATE TABLE test_date(
+	f1 DATE
+);
+
+DESC test_date;
+
+INSERT INTO test_date(f1) VALUES ('2020-10-01'), ('20220101'), (20220202);
+SELECT * FROM test_date;
+
+-- INSERT INTO test_date(f1) VALUES (2021-01-01); #  Err 1292 - Incorrect date value: '2019' for column 'f1' at row 1
+
+# 00-01-01, 000101 -> 2000-01-01
+# 69-10-01, 691001 -> 2069-10-01
+# 70-01-01, 700101 -> 1970-01-01
+# 99-01-01, 990101 -> 1999-01-01
+INSERT INTO test_date(f1) VALUES ('00-01-01'), ('000101'), ('69-10-01'), ('691001'), ('70-01-01'), ('700101'), ('99-01-01'), ('990101');
+SELECT * FROM test_date;
+
+# 使用CURRENT_DATE()或者NOW()函数式，会插入当前系统的日期。
+INSERT INTO test_date(f1) VALUES (CURDATE()), (NOW());
+
+/* 3. TIME类型
+	 TIME类型用来表示时间，不包含日期部分。在MySQL中，需要3个字节的存储空间来存储TIME类型的数据，
+	 可以使用“HH:MM:SS”格式来表示TIME类型，其中，HH表示小时，MM表示分钟，SS表示秒。
+
+	 在MySQL中，向TIME类型的字段插入数据时，也可以使用几种不同的格式。 
+
+	（1）可以使用带有冒号的字符串，比如' D HH:MM:SS' 、' HH:MM:SS '、' HH:MM '、' D HH:MM '、' D HH '或' SS '格式，
+			 都能被正确地插入TIME类型的字段中。其中D表示天，其最小值为0，最大值为34。如果使用带有D格式的字符串插入TIME类型的
+			 字段时，D会被转化为小时，计算格式为D*24+HH。当使用带有冒号并且不带D的字符串表示时间时，表示当天的时间，
+			 比如12:10表示12:10:00，而不是00:12:10。 
+
+	（2）可以使用不带有冒号的字符串或者数字，格式为' HHMMSS '或者HHMMSS 。
+			 如果插入一个不合法的字符串或者数字，MySQL在存储数据时，会将其自动转化为00:00:00进行存储。
+			 比如1210，MySQL会将最右边的两位解析成秒，表示00:12:10，而不是12:10:00。 
+
+	（3）使用CURRENT_TIME() 或者NOW() ，会插入当前系统的时间。
+ */
+
+
+/* 4. DATETIME类型
+	 
+ */
+
+
+/* 2. DATE类型
+	 
+ */
