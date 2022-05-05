@@ -432,7 +432,7 @@ SELECT * FROM test_date;
 # 使用CURRENT_DATE()或者NOW()函数式，会插入当前系统的日期。
 INSERT INTO test_date(f1) VALUES (CURDATE()), (NOW());
 
-/* 3. TIME类型
+/* 6.3. TIME类型
 	 TIME类型用来表示时间，不包含日期部分。在MySQL中，需要3个字节的存储空间来存储TIME类型的数据，
 	 可以使用“HH:MM:SS”格式来表示TIME类型，其中，HH表示小时，MM表示分钟，SS表示秒。
 
@@ -449,13 +449,143 @@ INSERT INTO test_date(f1) VALUES (CURDATE()), (NOW());
 
 	（3）使用CURRENT_TIME() 或者NOW() ，会插入当前系统的时间。
  */
+USE test04;
 
+CREATE TABLE test_time1(
+	f1 TIME
+);
 
-/* 4. DATETIME类型
-	 
+INSERT INTO test_time1 VALUES ('2 12:30:29'), ('12:35:29'), ('12:40'), ('2 12:40'), ('1 05'), ('45');
+
+SELECT * FROM test_time1;
+
+INSERT INTO test_time1 VALUES ('123520'), (124011), (1210);
+INSERT INTO test_time1 VALUES (NOW()), (CURRENT_TIME());
+
+/* 6.4. DATETIME类型
+	 DATETIME类型在所有的日期时间类型中占用的存储空间最大，总共需要8 个字节的存储空间。在格式上
+	 为DATE类型和TIME类型的组合，可以表示为YYYY-MM-DD HH:MM:SS ，其中YYYY表示年份，MM表示月份，
+	 DD表示日期，HH表示小时，MM表示分钟，SS表示秒。
+
+	 在向DATETIME类型的字段插入数据时，同样需要满足一定的格式条件。
+
+	 1) 以YYYY-MM-DD HH:MM:SS 格式或者YYYYMMDDHHMMSS 格式的字符串插入DATETIME类型的字段时，
+		  最小值为1000-01-01 00:00:00，最大值为9999-12-03 23:59:59。
+
+				以YYYYMMDDHHMMSS格式的数字插入DATETIME类型的字段时，会被转化为YYYY-MM-DD HH:MM:SS格式。
+			 
+		2) 以YY-MM-DD HH:MM:SS 格式或者YYMMDDHHMMSS 格式的字符串插入DATETIME类型的字段时，
+			 两位数的年份规则符合YEAR类型的规则，00到69表示2000到2069；70到99表示1970到1999。
+
+		3) 使用函数CURRENT_TIMESTAMP() 和NOW() ，可以向DATETIME类型的字段插入系统的当前日期和时间。
  */
+CREATE TABLE test_datetime1(
+	dt datetime
+);
 
+INSERT INTO test_datetime1
+VALUES ('2021-01-01 06:50:30'), ('20210101065030');
 
-/* 2. DATE类型
+INSERT INTO test_datetime1
+VALUES ('99-01-01 00:00:00'), ('990101000000'), ('20-01-01 00:00:00'), ('200101000000');
+
+INSERT INTO test_datetime1
+VALUES (20200101000000), (200101000000), (19990101000000), (990101000000);
+
+INSERT INTO test_datetime1
+VALUES (CURRENT_TIMESTAMP()), (NOW());
+
+SELECT * FROM test_datetime1;
+
+# `CURRENT_TIMESTAMP`()用来显示当前的时间YYYY-MM-DD HH:MM:SS
+SELECT CURRENT_TIMESTAMP() FROM DUAL;
+
+/* 6.5. TIMESTAMP 类型
+	 TIMESTAMP类型也可以表示日期时间，其显示格式与DATETIME类型相同，都是YYYY-MM-DD HH:MM:SS，
+	 需要4个字节的存储空间。但是TIMESTAMP存储的时间范围比DATETIME要小很多，只能存储“1970-01-01 00:00:01 UTC”
+	 到“2038-01-19 03:14:07 UTC”之间的时间。其中，UTC表示世界统一时间，也叫作世界标准时间。
+
+		 存储数据的时候需要对当前时间所在的时区进行转换，查询数据的时候再将时间转换回当前的时区。
+		 因此，使用TIMESTAMP存储的同一个时间值，在不同的时区查询时会显示不同的时间。
 	 
+	 向TIMESTAMP类型的字段插入数据时，当插入的数据格式满足YY-MM-DD HH:MM:SS和YYMMDDHHMMSS时，
+	 两位数值的年份同样符合YEAR类型的规则条件，只不过表示的时间范围要小很多。
+
+	 如果向TIMESTAMP类型的字段插入的时间超出了TIMESTAMP类型的范围，则MySQL会抛出错误信息。
  */
+CREATE TABLE test_timestamp1(
+		ts TIMESTAMP
+);
+
+INSERT INTO test_timestamp1
+VALUES ('1999-01-01 03:04:50'), ('19990101030405'), ('99-01-01 03:04:05'), ('990101030405');
+
+INSERT INTO test_timestamp1 VALUES ('2020@01@01@00@00@00'), ('20@01@01@00@00@00');
+
+INSERT INTO test_timestamp1 VALUES (CURRENT_TIMESTAMP()), (NOW());
+
+#Incorrect datetime value
+INSERT INTO test_timestamp1 VALUES ('2038-01-20 03:14:07');
+
+SELECT * FROM test_timestamp1;
+
+
+## 对比TIMESTAMP和DATETIME
+/*
+	TIMESTAMP和DATETIME的区别：
+
+	1) TIMESTAMP存储空间比较小，表示的日期时间范围也比较小
+
+	2) 底层存储方式不同，TIMESTAMP底层存储的是毫秒值，距离1970-1-1 0:0:0 0毫秒的毫秒值。
+
+	3) 两个日期比较大小或日期计算时，TIMESTAMP更方便、更快。
+
+	4) TIMESTAMP和时区有关。TIMESTAMP会根据用户的时区不同，显示不同的结果。而DATETIME则只能
+	反映出插入时当地的时区，其他时区的人查看数据必然会有误差的。
+*/
+CREATE TABLE test_time(
+	d1 DATETIME,
+	d2 TIMESTAMP
+);
+
+INSERT INTO test_time VALUES ('2021-09-02 12:23:34', '2021-09-02 12:23:34');
+INSERT INTO test_time VALUES (NOW(), NOW());
+
+SELECT * FROM test_time;
+/* 没有修改时区之前的查询
+mysql> SELECT * FROM test_time;
++---------------------+---------------------+
+| d1                  | d2                  |
++---------------------+---------------------+
+| 2021-09-02 12:23:34 | 2021-09-02 12:23:34 |
+| 2022-05-05 10:29:09 | 2022-05-05 10:29:09 |
++---------------------+---------------------+
+2 rows in set (0.00 sec)
+*/
+
+# 修改当前的时区
+SET time_zone = '+9:00';
+
+SELECT * FROM test_time;
+/* 修改时区之后的查询
+mysql> SELECT * FROM test_time;
++---------------------+---------------------+
+| d1                  | d2                  |
++---------------------+---------------------+
+| 2021-09-02 12:23:34 | 2021-09-02 12:23:34 |
+| 2022-05-05 10:29:09 | 2022-05-05 10:29:09 |
++---------------------+---------------------+
+2 rows in set (0.00 sec)
+*/
+
+## 总结：开发中的经验
+/*
+	用得最多的日期时间类型，就是 DATETIME 。虽然 MySQL 也支持 YEAR（年）、 TIME（时间）、	DATE（日期），
+	以及 TIMESTAMP 类型，但是在实际项目中，尽量用 DATETIME 类型。
+
+  因为这个数据类型包括了完整的日期和时间信息，取值范围也最大，使用起来比较方便。
+	毕竟，如果日期时间信息分散在好几个字段，很不容易记，而且查询的时候，SQL 语句也会更加复杂。
+
+	此外，一般存注册时间、商品发布时间等，不建议使用DATETIME存储，而是使用时间戳，因为DATETIME虽然直观，但不便于计算。
+*/
+
