@@ -578,7 +578,7 @@ mysql> SELECT * FROM test_time;
 2 rows in set (0.00 sec)
 */
 
-## 总结：开发中的经验
+## 6.6 总结：开发中的经验
 /*
 	用得最多的日期时间类型，就是 DATETIME 。虽然 MySQL 也支持 YEAR（年）、 TIME（时间）、	DATE（日期），
 	以及 TIMESTAMP 类型，但是在实际项目中，尽量用 DATETIME 类型。
@@ -589,3 +589,225 @@ mysql> SELECT * FROM test_time;
 	此外，一般存注册时间、商品发布时间等，不建议使用DATETIME存储，而是使用时间戳，因为DATETIME虽然直观，但不便于计算。
 */
 
+
+## 7. 文本字符串类型
+/*
+	 在实际的项目中，我们还经常遇到一种数据，就是字符串数据。
+	 
+	 MySQL中，文本字符串总体上分为CHAR、VARCHAR、TINYTEXT、TEXT、MEDIUMTEXT、LONGTEXT、ENUM、SET等类型
+ */
+
+
+/* 7.1 CHAR与VARCHAR类型
+CHAR和VARCHAR类型都可以存储比较短的字符串。
+-------------------------------------------------------------------------------
+字符串(文本)类型	特点		长度		长度范围					占用的存储空间
+-------------------------------------------------------------------------------
+CHAR(M) 					固定长度	M 			0 <= M <= 255 		M个字节
+VARCHAR(M) 				可变长度	M 			0 <= M <= 65535 	(实际长度 + 1) 个字节
+-------------------------------------------------------------------------------
+
+CHAR类型：
+		1) CHAR(M) 类型一般需要预先定义字符串长度。如果不指定(M)，则表示长度默认是1个字符。
+
+		2) 如果保存时，数据的实际长度比CHAR类型声明的长度小，则会在右侧填充空格以达到指定的长
+			 度。当MySQL检索CHAR类型的数据时，CHAR类型的字段会去除尾部的空格。
+
+		3) 定义CHAR类型字段时，声明的字段长度即为CHAR类型字段所占的存储空间的字节数。
+
+
+VARCHAR类型：
+		1) VARCHAR(M) 定义时， 必须指定长度M，否则报错。
+
+		2) MySQL4.0版本以下，varchar(20)：指的是20字节，如果存放UTF8汉字时，只能存6个（每个汉字3字
+		节） ；MySQL5.0版本以上，varchar(20)：指的是20字符。
+
+		3) 检索VARCHAR类型的字段数据时，会保留数据尾部的空格。VARCHAR类型的字段所占用的存储空间
+		为字符串实际长度加1个字节。
+
+## 哪些情况使用CHAR或VARCHAR更好
+-------------------------------------------------------------------------------
+	类型				特点			空间上				时间上		适用场景
+-------------------------------------------------------------------------------
+	CHAR(M) 		固定长度	浪费存储空间	效率高		存储不大，速度要求高
+	VARCHAR(M) 	可变长度	节省存储空间	效率低		非CHAR的情况
+-------------------------------------------------------------------------------
+
+	情况1：存储很短的信息。比如门牌号码101，201……这样很短的信息应该用char，因为varchar还要占个
+				 byte用于存储信息长度，本来打算节约存储的，结果得不偿失。
+
+	情况2：固定长度的。比如使用uuid作为主键，那用char应该更合适。因为他固定长度，varchar动态根据
+				 长度的特性就消失了，而且还要占个长度信息。
+
+	情况3：十分频繁改变的column。因为varchar每次存储都要有额外的计算，得到长度等工作，如果一个
+				 非常频繁改变的，那就要有很多的精力用于计算，而这些对于char来说是不需要的。
+
+	情况4：具体存储引擎中的情况：
+			1) MyISAM 数据存储引擎和数据列：MyISAM数据表，最好使用固定长度(CHAR)的数据列代替可变长
+			   度(VARCHAR)的数据列。这样使得整个表静态化，从而使数据检索更快，用空间换时间。
+
+		  2) MEMORY 存储引擎和数据列：MEMORY数据表目前都使用固定长度的数据行存储，因此无论使用
+				 CHAR或VARCHAR列都没有关系，两者都是作为CHAR类型处理的。
+
+			3) InnoDB 存储引擎，建议使用VARCHAR类型。因为对于InnoDB数据表，内部的行存储格式并没有区
+				 分固定长度和可变长度列（所有数据行都使用指向数据列值的头指针），而且主要影响性能的因素
+				 是数据行使用的存储总量，由于char平均占用的空间多于varchar，所以除了简短并且固定长度的，
+				 其他考虑varchar。这样节省空间，对磁盘I/O和数据存储总量比较好。
+*/
+
+# 1) CHAR类型
+CREATE TABLE test_char1(
+	c1 CHAR,
+	c2 CHAR(5)
+);
+
+DESC test_char1;
+
+INSERT INTO test_char1(c1) VALUES ('a');
+
+# [Err] 1406 - Data too long for column 'c1' at row 
+INSERT INTO test_char1(c1) VALUES ('ab');
+
+
+INSERT INTO test_char1(c2) VALUES ('hello');
+INSERT INTO test_char1(c2) VALUES ('ab');
+INSERT INTO test_char1(c2) VALUES ('数据库');
+INSERT INTO test_char1(c2) VALUES ('数据库哈哈');
+
+# [Err] 1406 - Data too long for column 'c2' at row 1
+INSERT INTO test_char1(c2) VALUES ('mysql数据库');
+
+SELECT * FROM test_char1;
+
+SELECT CONCAT(c2, '***') FROM test_char1;
+
+# 此时读取的时候会自动吧空格去掉
+INSERT INTO test_char1(c2) VALUES ('ab  ');
+SELECT CHAR_LENGTH(c2) FROM test_char1;
+
+
+# 2) VARCHAR类型
+CREATE TABLE test_varchar1(
+	NAME VARCHAR #错误
+);
+
+#Column length too big for column 'NAME' (max = 21845);
+# 因为最多存储65535个字节，UTF-8中一个字符占用3个字节，因此最多可以存储65535/3=21845个字符
+CREATE TABLE test_varchar2(
+	NAME VARCHAR(65535) #错误
+);
+
+CREATE TABLE test_varchar3(
+	NAME VARCHAR(5)
+);
+
+INSERT INTO test_varchar3 VALUES('数据库'),('数据库练习');
+
+#Data too long for column 'NAME' at row 1
+INSERT INTO test_varchar3 VALUES('MySQL数据库');
+
+SELECT * FROM test_varchar3;
+
+
+## 7.2 TEXT类型
+/*
+	在MySQL中，TEXT用来保存文本类型的字符串，总共包含4种类型，分别为TINYTEXT、TEXT、MEDIUMTEXT 和 LONGTEXT 类型。
+
+	在向TEXT类型的字段保存和查询数据时，系统自动按照实际长度存储，不需要预先定义长度。这一点和VARCHAR类型相同。
+
+	由于实际存储的长度不确定，MySQL 不允许 TEXT 类型的字段做主键。遇到这种情况，你只能采用CHAR(M)，或者 VARCHAR(M)。
+
+	开发中的经验：
+		 TEXT文本类型，可以存比较大的文本段，搜索速度稍慢，因此如果不是特别大的内容，建议使用CHAR，
+		 VARCHAR来代替。还有TEXT类型不用加默认值，加了也没用。而且text和blob类型的数据删除后容易导致
+		 “空洞”，使得文件碎片比较多，所以频繁使用的表不建议包含TEXT类型字段，建议单独分出去，单独用一个表。
+ */
+CREATE TABLE test_text(
+	tx TEXT
+);
+
+# 其中空格也算一个字符，此时在保存和查询数据时，并没有删除TEXT类型的数据尾部的空格。
+INSERT INTO test_text VALUES('helloworld ');
+INSERT INTO test_text VALUES('hello world');
+
+SELECT CHAR_LENGTH(tx) FROM test_text; #10
+
+
+## 8. ENUM类型
+/*
+		ENUM类型也叫作枚举类型，ENUM类型的取值范围需要在定义字段时进行指定。设置字段值时，ENUM
+		类型只允许从成员中选取单个值，不能一次选取多个值。
+
+		其所需要的存储空间由定义ENUM类型时指定的成员个数决定。
+    
+    --------------------------------------------------------
+		文本字符串类型	长度	长度范围					占用的存储空间
+		--------------------------------------------------------
+		ENUM 						L 		1 <= L <= 65535 	1或2个字节
+		--------------------------------------------------------
+
+		1) 当ENUM类型包含1~255个成员时，需要1个字节的存储空间
+		2) 当ENUM类型包含256~65535个成员时，需要2个字节的存储空间
+		3) ENUM类型的成员个数上限为65535.
+
+ */
+CREATE TABLE test01_enum(
+	season ENUM('春','夏','秋','冬','unknow')
+);
+
+INSERT INTO test01_enum VALUES ('春'), ('冬');
+INSERT INTO test01_enum VALUES ('夏'), ('秋');
+
+# 插入时会忽略大小写
+INSERT INTO test01_enum VALUES ('unknow');
+INSERT INTO test01_enum VALUES ('UNKNOW');
+
+# 可以使用1-xx的编号来插入
+INSERT INTO test01_enum VALUES (1), ('3');
+
+# 没有限制非空的情况下，可以添加null值
+INSERT INTO test01_enum VALUES (NULL);
+
+# [Err] 1265 - Data truncated for column 'season' at row 1
+-- INSERT INTO test01_enum VALUES ('夏天');
+-- INSERT INTO test01_enum VALUES ('天');
+
+SELECT * FROM test01_enum;
+
+
+## 9. SET类型
+/*
+		SET表示一个字符串对象，可以包含0个或多个成员，但成员个数的上限为64。
+		设置字段值时，可以取取值范围内的0个或多个值。
+
+		当SET类型包含的成员个数不同时，其所占用的存储空间也是不同的，具体如下：
+
+		-----------------------------------------------------
+		成员个数范围（L表示实际成员个数） 占用的存储空间
+		1 <= L <= 8 											1个字节
+		9 <= L <= 16 											2个字节
+		17 <= L <= 24 										3个字节
+		25 <= L <= 32 										4个字节
+		33 <= L <= 64 										8个字节
+		-----------------------------------------------------
+
+		SET类型在存储数据时成员格式越多，其占用的存储空间越大。
+		
+		注意：SET类型在选取成员时，可以一次选择多个成员，这一点与ENUM类型不同。
+ */ 
+CREATE TABLE test_set(
+	s SET('A', 'B', 'C')
+);
+
+INSERT INTO test_set (s) VALUES ('A');
+
+# note：在进行set集合的插入时，’,‘后面不可以加空格，否则会报错
+INSERT INTO test_set (s) VALUES ('A,B'), ('A,B,C');
+
+# 插入重复的SET类成员时，MySql会自动删除重复的成员 
+INSERT INTO test_set (s) VALUES ('A,B,C,A'), ('A,C,B,A');
+
+# 向SET类型的字段插入SET成员中不存在的值时，MySQL会报错。
+INSERT INTO test_set (s) VALUES ('A,B,C,D');
+
+SELECT * FROM test_set;
