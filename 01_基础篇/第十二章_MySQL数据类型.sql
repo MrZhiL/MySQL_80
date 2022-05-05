@@ -811,3 +811,119 @@ INSERT INTO test_set (s) VALUES ('A,B,C,A'), ('A,C,B,A');
 INSERT INTO test_set (s) VALUES ('A,B,C,D');
 
 SELECT * FROM test_set;
+
+
+## 10. 二进制字符串类型
+/*
+		mysql中的二进制字符串类型主要存储一些二进制数据，比如可以存储图片、音频和视频等二进制数据。
+
+		mysql中支持的二进制字符串类型主要包括BINARY、VARBINARY、TINYBLOB、BLOB、MEDIUMBLOB和LONGBLOB类型。
+
+10.1 BINARY与VARBINARY类型
+		BINARY和VARBINARY类似于CHAR和VARCHAR，只是它们存储的是二进制字符串。
+
+		BINARY (M)为固定长度的二进制字符串，M表示最多能存储的字节数，取值范围是0~255个字符。如果未
+		指定(M)，表示只能存储1个字节。例如BINARY (8)，表示最多能存储8个字节，如果字段值不足(M)个字
+		节，将在右边填充'\0'以补齐指定长度。
+
+		VARBINARY (M)为可变长度的二进制字符串，M表示最多能存储的字节数，总字节数不能超过行的字节长
+		度限制65535，另外还要考虑额外字节开销，VARBINARY类型的数据除了存储数据本身外，还需要1或2个
+		字节来存储数据的字节数。VARBINARY类型必须指定(M) ，否则报错
+
+ */
+CREATE TABLE test_binary1(
+f1 BINARY,  # BINARY默认长度为1
+f2 BINARY(3),
+-- f3 VARBINARY, # VARBINARY必须指定长度
+f4 VARBINARY(10)
+);
+
+DESC test_binary1;
+
+INSERT INTO test_binary1(f1, f2) VALUES ('a', 'abc');
+
+SELECT * FROM test_binary1;
+
+# [Err] 1406 - Data too long for column 'f1' at row 1
+INSERT INTO test_binary1(f1) VALUES ('ab');
+
+INSERT INTO test_binary1(f2, f4) VALUES ('ab', 'ab');
+
+# LENGTH(2) = 3，是因为BINARY(3)设定的长度为3，
+# 而VARBINARY(10)为可变长度，'ab'占用了二个字节
+SELECT LENGTH(f2), LENGTH(f4) FROM test_binary1;
+
+
+INSERT INTO test_binary1(f2, f4) VALUES ('a', 'abcdefg');
+
+
+
+## 10.2 BLOB类型
+/*
+		BLOB是一个二进制大对象，可以容纳可变数量的数据。
+
+		MySQL中的BLOB类型包括TINYBLOB BLOB MDEIUMBLOB和	LONGBLOB 4中类型，它们可容纳值的最大长度不同。
+		可以存储一个二进制的大对象，比如图片、音频和视频等。
+
+		需要注意的是，在实际工作中，往往不会在MySQL数据库中使用BLOB类型存储大对象数据，通常会将图片、
+		音频和视频文件存储到服务器的磁盘中，并将图片、音频和视频的访问路径存储到MySQL中。
+
+		二进制字符串类型		值的长度		长度范围												占用空间
+		TINYBLOB 						L 					0 <= L <= 255 									L + 1 个字节
+		BLOB 								L 					0 <= L <= 65535（相当于64KB） 	L + 2 个字节
+		MEDIUMBLOB 					L 					0 <= L <= 16777215 （相当于16MB） L + 3 个字节
+		LONGBLOB 						L 					0 <= L <= 4294967295（相当于4GB） L + 4 个字节
+ 
+
+TEXT和BLOB的使用注意事项：
+		在使用text和blob字段类型时要注意以下几点，以便更好的发挥数据库的性能。
+
+		① BLOB和TEXT值也会引起自己的一些问题，特别是执行了大量的删除或更新操作的时候。删除这种值
+		会在数据表中留下很大的" 空洞"，以后填入这些"空洞"的记录可能长度不同。为了提高性能，建议定期
+		使用 OPTIMIZE TABLE 功能对这类表进行碎片整理。
+
+		② 如果需要对大文本字段进行模糊查询，MySQL 提供了前缀索引。但是仍然要在不必要的时候避免检
+		索大型的BLOB或TEXT值。例如，SELECT * 查询就不是很好的想法，除非你能够确定作为约束条件的
+		WHERE子句只会找到所需要的数据行。否则，你可能毫无目的地在网络上传输大量的值。
+
+		③ 把BLOB或TEXT列分离到单独的表中。在某些环境中，如果把这些数据列移动到第二张数据表中，可
+		以让你把原数据表中的数据列转换为固定长度的数据行格式，那么它就是有意义的。这会减少主表中的
+		碎片，使你得到固定长度数据行的性能优势。它还使你在主数据表上运行 SELECT * 查询的时候不会通过
+		网络传输大量的BLOB或TEXT值。
+
+*/
+CREATE TABLE test_blob1(
+	id INT,
+	img MEDIUMBLOB
+);
+
+DESC test_blob1;
+
+INSERT INTO test_blob1(id) VALUES (1001);
+
+SELECT * FROM test_blob1;
+
+
+## 11. JSON类型
+/*
+		JSON（JavaScript Object Notation）是一种轻量级的数据交换格式。简洁和清晰的层次结构使得 JSON 成
+		为理想的数据交换语言。它易于人阅读和编写，同时也易于机器解析和生成，并有效地提升网络传输效
+		率。JSON 可以将 JavaScript 对象中表示的一组数据转换为字符串，然后就可以在网络或者程序之间轻
+		松地传递这个字符串，并在需要的时候将它还原为各编程语言所支持的数据格式。
+
+
+		在MySQL 5.7中，就已经支持JSON数据类型。在MySQL 8.x版本中，JSON类型提供了可以进行自动验证的
+		JSON文档和优化的存储结构，使得在MySQL中存储和读取JSON类型的数据更加方便和高效。创建数据
+		表，表中包含一个JSON类型的字段 js 。
+ */
+CREATE TABLE test_json(
+	js json
+);
+
+INSERT INTO test_json(js) 
+VALUES ('{"name":"mrzhi", "age":18, "address":{"province":"beijing", "city":"beijing"}}');
+
+SELECT * FROM test_json;
+
+# note: 当需要检索JSON类型的字段中数据的某个具体值时，可以使用“->”和“->>”符号。
+SELECT js -> '$.name' AS NAME, js -> '$.age' AS age, js -> '$.address.province' AS province, js -> '$.address.city' AS city FROM test_json;
