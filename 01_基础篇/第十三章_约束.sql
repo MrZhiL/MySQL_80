@@ -291,3 +291,127 @@ show index from test_unique;
 
 # 删除Unique索引
 ALTER TABLE test_unique DROP INDEX uk_test_unique_salary;
+
+## 4. PRIMARY KEY 约束（主键约束）
+/*  
+		1) 作用：用来唯一标识表中的一行记录
+		2) 关键字：primary key
+		3) 特点：主键约束相当于唯一约束 + 非空约束的组合，主键约束列不允许重复，也不允许出现空值
+				* 一个表最多只能有一个主键约束，建立主键约束可以在列级别创建，也可以在表级别创建
+				* 主键约束对应着表中的一列或者多列（复合主键）
+				* 如果是多列组合的复合主键约束，那么这些列都不允许为空值，并且组合的值不允许重复。
+				* MySQL的主键名总是PRIMARY，就算自己命名了主键约束也没用。
+				* 当创建主键约束时，系统默认会在所在的列或列组合上建立对应的主键索引（能够根据主键
+				  查询的，就根据主键查询，效率更高）。如果删除了主键约束，主键约束对应的索引就自动删除了。
+
+				* 需要注意的一点是，不要修改主键字段的值。因为主键是数据记录的唯一标识，如果修改了主键
+				  的值，就有可能破坏数据的完整性。
+			
+		4) 添加主键约束：建表时指定主键约束(列级模式和表级模式)；建表后增加主键约束
+
+				create table 表名称(
+				字段名 数据类型 primary key, #列级模式
+				字段名 数据类型,
+				字段名 数据类型
+				);
+
+				create table 表名称(
+				字段名 数据类型,
+				字段名 数据类型,
+				字段名 数据类型,
+				[constraint 约束名] primary key(字段名) #表级模式
+				);
+ */
+# 4.1 在create table时添加约束
+# note: 一个表中最多只能有一个primary key
+create TABLE test3(
+	id INT PRIMARY KEY, # 列级约束
+-- 	last_name VARCHAR(15) PRIMARY KEY, # [Err] 1068 - Multiple primary key defined
+	last_name VARCHAR(15),
+	salary DECIMAL(10, 2),
+	email VARCHAR(25)
+);
+
+create TABLE test4(
+	id INT,
+	last_name VARCHAR(15),
+	salary DECIMAL(10, 2),
+	email VARCHAR(25),
+
+	# 表级约束，MySQL的主键名总是PRIMARY，就算自己命名了主键约束也没用。
+	CONSTRAINT pk_test4_id PRIMARY KEY(id) # 此时没有必要其名字
+);
+
+
+# note1: 主键约束的特征：非空且唯一，用于唯一的标识表中的一条记录。
+DESC test3;
+DESC test4;
+
+# note2: MySQL的主键名总是PRIMARY，就算自己命名了主键约束也没用。
+SELECT * FROM information_schema.TABLE_CONSTRAINTS
+WHERE table_name = 'test3';
+
+SELECT * FROM information_schema.TABLE_CONSTRAINTS
+WHERE table_name = 'test4';
+
+SHOW index FROM test3;
+SHOW index FROM test4;
+
+
+INSERT INTO test3(id, last_name, salary, email)
+VALUES (1, 'Tom', 4500, 'tom@163.com');
+
+# [Err] 1062 - Duplicate entry '1' for key 'test3.PRIMARY'
+INSERT INTO test3(id, last_name, salary, email)
+VALUES (1, 'Tom', 4500, 'tom@163.com');
+# [Err] 1048 - Column 'id' cannot be null
+INSERT INTO test3(id, last_name, salary, email)
+VALUES (NULL, 'Tom', 4500, 'tom@163.com');
+# 正确
+INSERT INTO test3(id, last_name, salary, email)
+VALUES (2, 'Tom', 4500, null);
+# 正确
+INSERT INTO test3(id, last_name, salary, email)
+VALUES (3, 'Tom', 4500, null);
+
+SELECT * FROM test3;
+
+
+# 4.2 复合类型
+CREATE TABLE test_user2(
+	id INT,
+	name varchar(15),
+	passwd varchar(25),
+
+	PRIMARY KEY(name, passwd) # 设置复合主键约束
+);
+
+SHOW INDEX FROM test_user2;
+
+# 如果是多列组合的复合主键约束，那么这些列都不允许为空值，并且组合的值不允许重复
+INSERT INTO test_user2(id, name, passwd) VALUES (1, 'Tom', '1c2d');
+INSERT INTO test_user2(id, name, passwd) VALUES (1, 'Tom1', '1c2d');
+INSERT INTO test_user2(id, name, passwd) VALUES (1, 'null', '1c2d'); # 正确
+# [Err] 1048 - Column 'name' cannot be null
+INSERT INTO test_user2(id, name, passwd) VALUES (1, null, '1c2d');
+
+
+SELECT * FROM test_user2;
+
+# 4.3 在ALTER TABLE中添加主键约束
+create TABLE test5(
+	id INT,
+	last_name VARCHAR(15),
+	salary DECIMAL(10, 2),
+	email VARCHAR(25)
+);
+
+DESC test5;
+
+ALTER TABLE test5 ADD PRIMARY KEY (id);
+
+# 4.4 删除主键约束(在实际开发中，不会去删除表中的主键约束！！)
+# 说明：删除主键约束，不需要指定主键名，因为一个表只有一个主键，删除主键约束后，非空还存在。
+ALTER TABLE test5 DROP PRIMARY KEY;
+
+
