@@ -415,3 +415,150 @@ ALTER TABLE test5 ADD PRIMARY KEY (id);
 ALTER TABLE test5 DROP PRIMARY KEY;
 
 
+
+## 5. 自增列：AUTO_INCREMENT
+/*
+		1) 作用：某个字段的值自增
+		2) 关键字：auto_increament
+		3) 特点和要求：
+					* 一个表中最多只能有一个自增长列
+					* 当需要产生唯一标识符或顺序值时，可设置自增长
+					* 自增长列约束的列必须是键列（主键列，唯一键列）
+					* 自增约束的列的数据类型必须是整形类型
+					* 如果自增列指定了0和null，会在当前最大值的基础上自增；如果自增列手动指定了具体值，直接赋值为具体值
+					* 
+		4) 开发中，一旦主键作用的字段上声明有AUTO_INCREMENT，则我们在添加数据时，就不要给主键对应的字段去赋值了。
+
+ */
+# 5.1 创建auto_increament方式1：
+CREATE TABLE test6(
+-- 	id INT AUTO_INCREMENT, # error, auto_increament必须指定在主键列或者唯一键列上
+	id INT PRIMARY KEY AUTO_INCREMENT,
+-- 	last_name VARCHAR(15) UNIQUE AUTO_INCREMENT # error, 自增约束的列的数据类型必须是整形类型
+	last_name VARCHAR(15)
+);
+
+show index from test6;
+
+# 创建auto_increament方式2：
+CREATE TABLE test7(
+-- 	id INT AUTO_INCREMENT, # error, auto_increament必须指定在主键列或者唯一键列上
+	id INT AUTO_INCREMENT,
+-- 	last_name VARCHAR(15) UNIQUE AUTO_INCREMENT # error, 自增约束的列的数据类型必须是整形类型
+	last_name VARCHAR(15),
+
+	PRIMARY KEY(id)
+);
+show index from test7;
+
+
+INSERT INTO test6(last_name) VALUES ('Tom'); # 这里连续运行了4次(1,2,3,4)
+SELECT * FROM test6;
+
+# 5.2 当我们向主键(含AUTO_INCREMENT)的字段上添加0或null时，实际上会自动的往上添加指定的id值
+INSERT INTO test6(id, last_name) VALUES (0, 'Tom'); # 5
+INSERT INTO test6(id, last_name) VALUES (null, 'Tom'); # 6
+
+# 5.3 如果自增列手动指定了具体值，直接赋值为具体值
+INSERT INTO test6(id, last_name) VALUES (10, 'JACK'); # id = 10
+INSERT INTO test6(id, last_name) VALUES (-10, 'JACK'); # id = -10
+INSERT INTO test6(last_name) VALUES ('Tom'); # id = 11
+
+
+# 5.4 使用ALTER TABLE来向表中添加AUTO_INCREMENT
+CREATE TABLE test8(
+	id INT PRIMARY KEY,
+	last_name VARCHAR(15)
+);
+
+DESC test8;
+
+ALTER TABLE test8 MODIFY id INT AUTO_INCREMENT;
+
+# 5.5 在ALTER TABLE中删除auto_increment
+ALTER TABLE test8 MODIFY id INT;
+
+# 5.6 MySQL 8.0新特性——自增变量的持久化
+/*
+	在MySQL 8.0之前，自增主键AUTO_INCREMENT的值如果大于max(primary key)+1，在MySQL重启后，会重
+	置AUTO_INCREMENT=max(primary key)+1，这种现象在某些情况下会导致业务主键冲突或者其他难以发
+	现的问题。 下面通过案例来对比不同的版本中自增变量是否持久化。 在MySQL 5.7版本中，测试步骤如
+	下： 创建的数据表中包含自增主键的id字段，语句如下
+*/
+
+/* 在mysql5.7版本中
+		## MySQL5.7中的AUTO_INCREMENT自增测试
+
+		CREATE DATABASE dbtest12;
+
+		USE dbtest12;
+
+		CREATE TABLE test9(
+			id INT PRIMARY KEY AUTO_INCREMENT
+		);
+
+		DESC test9;
+
+		# 1. 连续插入4个元素
+		INSERT INTO test9 VALUES (0), (0), (0), (0);
+
+		SELECT * FROM test9; # 1,2,3,4
+
+		# 2. 当删除id=4以后
+		DELETE FROM test9 WHERE id = 4;
+		SELECT * FROM test9; # 1,2,3
+
+		# 3. 继续插入一个元素，此时会从5开始，即使删除掉4以后
+		INSERT INTO test9 VALUES (0);
+		SELECT * FROM test9; # 1,2,3,5
+
+		# 4. 删除id=5的元素
+		DELETE FROM test9 WHERE id = 5;
+		SELECT * FROM test9; # 1,2,3
+
+		# 5. 重启服务器，然后继续插入
+		# 在DOS(管理员)中使用net stop/start mysql57重启服务器
+		# 可以发现只有重启服务器之后才会继续从编号4插入
+		INSERT INTO test9 VALUES (0), (0);
+		SELECT * FROM test9; # 1,2,3,4,5
+
+ */
+
+
+## MySQL5.7中的AUTO_INCREMENT自增测试
+
+
+## 在 mysql8.0 版本中
+CREATE TABLE test9(
+	id INT PRIMARY KEY AUTO_INCREMENT
+);
+
+DESC test9;
+
+# 1. 连续插入4个元素
+INSERT INTO test9 VALUES (0), (0), (0), (0);
+
+SELECT * FROM test9; # 1,2,3,4
+
+# 2. 当删除id=4以后
+DELETE FROM test9 WHERE id = 4;
+SELECT * FROM test9; # 1,2,3
+
+# 3. 继续插入一个元素，此时会从5开始，即使删除掉4以后
+INSERT INTO test9 VALUES (0);
+SELECT * FROM test9; # 1,2,3,5
+
+# 4. 删除id=5的元素
+DELETE FROM test9 WHERE id = 5;
+SELECT * FROM test9; # 1,2,3
+
+# 5. 重启服务器，然后继续插入
+# 在DOS(管理员)中使用net stop/start mysql80重启服务器
+# 可以发现只有重启服务器之后会继续从编号5之后插入，即插入6,7
+INSERT INTO test9 VALUES (0), (0);
+SELECT * FROM test9; # 1,2,3,6,7
+
+INSERT INTO test9 VALUES (4); # 此时可以继续插入编号4，从而可以续上，减少碎片化
+
+
+
