@@ -808,6 +808,7 @@ ALTER TABLE emp5 DROP INDEX deptid;
 
 
 ## 8 小结：
+/* 
 问题1：如果两个表之间有关系（一对一、一对多），比如：员工表和部门表（一对多），它们之间是否
 一定要建外键约束？
 答：不是的
@@ -826,6 +827,58 @@ note: 在 MySQL 里，外键约束是有成本的，需要消耗系统资源。�
 			合。比如大型网站的中央数据库，可能会因为外键约束的系统开销而变得非常慢。所以， MySQL 允
 			许你不使用系统自带的外键约束，在应用层面完成检查数据一致性的逻辑。也就是说，即使你不
 			用外键约束，也要想办法通过应用层面的附加逻辑，来实现外键约束的功能，确保数据的一致性
+*/
+
+
+## 9. CHECK约束
+/*
+		1) 作用：检查某个字段的值是否符合xx要求，一般是指的范围
+		2) 关键字：CHECK
+		3) 说明：MySQL5.7 不支持
+			 MySQL5.7 可以使用check约束，但check约束对数据验证没有任何作用。添加数据时，没有任何错误或警告
+			 但是MySQL8.0中可以使用CHECK约束了
+ */
+CREATE TABLE test_check(
+	id INT,
+	name VARCHAR(20),
+	salary DECIMAL(10, 2) CHECK (salary > 2000)
+);
+
+DESC test_check;
+
+INSERT INTO test_check VALUES (1, 'Tom', 2500);
+
+# [Err] 3819 - Check constraint 'test_check_chk_1' is violated.
+INSERT INTO test_check VALUES (2, 'jck', 1500);
+
+SELECT * FROM test_check;
+
+# 移除约束
+ALTER TABLE test_check DROP CHECK test_check_chk_1;
+
+SELECT * FROM information_schema.table_constraints WHERE table_name = 'test_check';
+
+# 添加约束(使用ALTER TABLE添加约束时，需要删除表中所有的数据)
+DELETE FROM test_check;
+ALTER TABLE test_check ADD CONSTRAINT CHECK (salary > 2000);
+
+INSERT INTO test_check VALUES (2, 'jck', 2500);
+INSERT INTO test_check VALUES (3, 'mry', 1500);
+INSERT INTO test_check VALUES (4, 'mry3', 1500);
+
+SELECT * FROM test_check;
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
