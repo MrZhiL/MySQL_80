@@ -855,28 +855,72 @@ SELECT * FROM test_check;
 
 # 移除约束
 ALTER TABLE test_check DROP CHECK test_check_chk_1;
+ALTER TABLE test_check DROP CHECK test_check_chk_3;
 
 SELECT * FROM information_schema.table_constraints WHERE table_name = 'test_check';
 
-# 添加约束(使用ALTER TABLE添加约束时，需要删除表中所有的数据)
-DELETE FROM test_check;
-ALTER TABLE test_check ADD CONSTRAINT CHECK (salary > 2000);
+# 添加约束(使用ALTER TABLE添加约束时，需要删除表中不符合的数据)
+DELETE FROM test_check WHERE salary < 2000; # 删除表中不符合要求的数据
+ALTER TABLE test_check ADD CONSTRAINT CHECK (salary > 2000); # 方式1：
+ALTER TABLE test_check MODIFY salary DECIMAL(10, 2) CHECK(salary > 2000); # 方式2
 
 INSERT INTO test_check VALUES (2, 'jck', 2500);
 INSERT INTO test_check VALUES (3, 'mry', 1500);
 INSERT INTO test_check VALUES (4, 'mry3', 1500);
 
 SELECT * FROM test_check;
+DESC test_check;
+
+## 10 DEFAULT约束
+/*
+		给某个字段/某列指定默认值，一旦设置默认值，在插入数据时，如果此字段没有显式赋值，则赋值为默认值
+ */
+# 1) 建表时添加DEFAULT约束
+CREATE TABLE test_default(
+	id INT,
+	name VARCHAR(15),
+	salary DECIMAL(10, 2) DEFAULT 2500 # 添加DEFAULT约束
+);
+
+DESC test_default;
+
+INSERT INTO test_default(id, name) VALUES (1, 'Tom'); # 此时salary默认为3000
+INSERT INTO test_default(id, name, salary) VALUES (2, 'Tom', 3000);
+
+SELECT * FROM test_default;
+
+# 2) 使用ATLER TABLE在表外添加和删除约束
+ALTER TABLE test_default MODIFY salary DECIMAL(8, 2);
+INSERT INTO test_default(id, name) VALUES (3, 'Tom3'); # 此时salary默认为null
+
+ALTER TABLE test_default MODIFY salary DECIMAL(10, 2) DEFAULT 2000;
+INSERT INTO test_default(id, name) VALUES (4, 'Tom4'); # 此时salary默认为2000
+
+SELECT * FROM test_default;
 
 
+## 3) 小结
+/* 
 
+面试1、为什么建表时，加 not null default '' 或 default 0
+答：不想让表中出现null值。
 
+面试2、为什么不想要 null 的值
+答:（1）不好比较。null是一种特殊值，比较时只能用专门的is null 和 is not null来比较。碰到运算符，通常返回null。
 
+	 （2）效率不高。影响提高索引效果。因此，我们往往在建表时 not null default '' 或 default 0
 
+面试3、带AUTO_INCREMENT约束的字段值是从1开始的吗？ 
+答：在MySQL中，默认AUTO_INCREMENT的初始值是1，每新增一条记录，字段值自动加1。设置自增属性（AUTO_INCREMENT）的时候，
+		还可以指定第一条插入记录的自增字段的值，这样新插入的记录的自增字段值从初始值开始递增，如在表中插入第一
+		条记录，同时指定id值为5，则以后插入的记录的id值就会从6开始往上增加。添加主键约束时，往往需要
+		设置字段自动增加属性。
 
-
-
-
+面试4、并不是每个表都可以任意选择存储引擎？ 外键约束（FOREIGN KEY）不能跨引擎使用。
+答：MySQL支持多种存储引擎，每一个表都可以指定一个不同的存储引擎，需要注意的是：外键约束是用来
+		保证数据的参照完整性的，如果表之间需要关联外键，却指定了不同的存储引擎，那么这些表之间是不
+		能创建外键约束的。所以说，存储引擎的选择也不完全是随意的。
+ */
 
 
 
