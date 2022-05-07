@@ -562,3 +562,270 @@ INSERT INTO test9 VALUES (4); # 此时可以继续插入编号4，从而可以�
 
 
 
+## 6. FOREIGN KEY 约束（外键约束）
+/*
+		1) 作用：限定某个表的某个字段的引用完整性
+			 比如：员工表的员工所在部门的选择，必须在部门表能找到对应的部分。
+			
+		2) 关键字：FOREIGN KEY
+		3) 主表和从表/父表和子表
+				
+			 主表（父表）：被引用的表，被参考的表
+			 从表（子表）：引用别人的表，参考别人的表
+			 
+			 例如：员工表的员工所在部门的这个字段的值要参考部门表：部门表时主表，员工表是从表。
+			 例如：学生表、课程表、选课表：选课表的学生和课程要分别参考学生表和课程表，学生表和课程表是主表，选课表是从表。
+
+		4) 特点： 
+				a) 从表的外键列，必须引用/参考主表的主键或唯一约束的列。
+					 因为被依赖/被参考的值必须是唯一的。
+				b) 在创建外键约束时，如果不给外键约束命名，默认名不是列名，
+					 而是自动产生一个外键名（例如student_ibfk_1），也可以指定外键约束名。
+				c) 创建(CREATE)表时就指定外键约束的话，先创建主表，在创建从表。 
+				d) 删表时，先删从表（或先删除外键约束），再删除主表
+				e) 当主表的记录被从表参考时，主表的记录将不允许删除，
+					 如果要删除数据，需要先删除从表中依赖该记录的数据，然后才可以删除主表的数据。
+				f) 在“从表”中指定外键约束，并且一个表可以建立多个外键约束。
+				j) 从表的外键列与主表被草考的列名字可以不相同，但是数据类型必须一样，逻辑意义一致。
+					 如果类型不一样，创建子表时，就会出现错误：ERROR 1005(HY000): Can't create table'DATABASE.tablename'(errno:150)
+				h) 当创建外键约束时，系统默认会在所在的列上建立对应的普通索引。但是索引名是外键的约束名。（根据外键查询效率很高）
+				i) 删除外键约束后，必须手动删除对应的索引。
+ */
+# 7.1 在CREATE TABLE时添加
+
+# 主表和从表；父表和子表：先创建主表dept1, 再创建从表emp1
+USE myemp7;
+
+# 1) 创建主表
+CREATE TABLE dept1(
+	dept_id INT,
+	dept_name VARCHAR(15)
+);
+
+# 1) 创建从表
+CREATE TABLE emp1(
+	emp_id INT,
+	emp_name VARCHAR(15),
+	department_id INT,
+
+	# 表级约束，外键约束 FOREIGN KEY
+	CONSTRAINT fk_emp1_dept_id FOREIGN KEY (department_id) REFERENCES dept1(dept_id)
+);
+
+ALTER TABLE emp1 ADD PRIMARY KEY (emp_id); # 可以对emp_id添加主键约束
+ALTER TABLE emp1 MODIFY emp_id INT AUTO_INCREMENT; # 添加auto_increment约束
+
+# 运行606-613行的代码时会报错，因为主表中的dept_id没有主键约束或唯一性约束
+# 调用以下代码后，继续运行606-613行代码进行测试，可以发现创建成功
+ALTER TABLE dept1 ADD PRIMARY KEY (dept_id);
+-- ALTER TABLE dept1 DROP PRIMARY KEY; # 删除主键约束
+
+DESC dept1;
+DESC emp1;
+
+# 可以使用show index from xxx来查看约束
+SHOW INDEX FROM dept1;
+SHOW INDEX FROM emp1;
+
+-- INSERT INTO emp1(emp_id, emp_name) VALUES (0, 'jack'); # right
+-- INSERT INTO emp1(emp_name) VALUES ('jack1'); # right
+-- INSERT INTO emp1(emp_name) VALUES ('jack2'); # right
+-- DELETE FROM emp1;
+SELECT * FROM emp1;
+SELECT * FROM dept1;
+
+# 7.2 演示外键效果
+# 1) 添加失败, 因为主表中没有相应的部门编号
+INSERT INTO emp1 VALUES (1001, 'Tom', 10);
+
+# 2) 添加成功，现在主表中创建该部门编号，然后再从表中插入
+INSERT INTO dept1 VALUES (10, 'IT');
+INSERT INTO emp1 VALUES (1001, 'Tom', 10);
+
+# 3) 如果直接对主表中的数据进行操作，可能会失败（因为从表关联，从而导致从表中关联的数据无法更改，除非先把从表中的数据删除）
+UPDATE dept1 SET dept_id = 20 WHERE dept_id = 10;
+UPDATE dept1 SET dept_name = 'HR' WHERE dept_id = 10; # 这个可以修改成功，因为从表中没有对dept_name 列进行关联
+DELETE FROM dept1 WHERE dept_id = 10;
+
+
+# 7.3 在ALTER TABLE时添加外键约束
+# 1) 创建主表
+CREATE TABLE dept2(
+	dept_id INT PRIMARY KEY,
+	dept_name VARCHAR(15)
+);
+
+# 2) 创建从表
+CREATE TABLE emp2(
+	emp_id INT PRIMARY KEY AUTO_INCREMENT,
+	emp_name VARCHAR(15),
+	department_id INT
+);
+
+# 3) 使用ALTER TABLE创建关联
+ALTER TABLE emp2 ADD CONSTRAINT pk_emp2_dept_id FOREIGN KEY (department_id) REFERENCES dept2(dept_id);
+
+SELECT * FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_NAME = 'emp2';
+
+
+## 7.4 约束等级
+/* 
+	 1) Cascade方式：在父表上update/delete记录时，同步update/delete子表的匹配记录
+	 2) Set null方式：在父表上update/delete记录时，将子表上匹配的记录的列设为null，
+										但是要主要子表的外键列不能为not null
+	 3) No action方式：如果子表中有匹配的记录，则不允许对父表对应候选键进行update/delete操作
+	 4) Restrict方式：同 no action，都是立即检查外键约束
+	 5) Set default方式：(在可视化工具SQLyog中可能显示空白)：父表有变更时，子表将外键列设置成一个默认的值，单Innodb不能识别。
+
+	 note1: 如果没有指定等级，就相等于RESTRICT方式
+	 note2: 对于外键约束，最好采用ON UPDATE CASCADE ON DELETE RESTRICT的方式
+ */
+# 1) 演示1：on update cascade on delete set NULL
+# a. 创建主表和从表
+CREATE TABLE dept3(
+	did INT PRIMARY KEY, # 部门编号
+	dname VARCHAR(5)		 # 部门名称
+);
+
+CREATE TABLE emp3(
+	eid INT PRIMARY KEY, # 员工编号
+	ename varchar(5),		 # 员工姓名
+	deptid INT,					 # 员工所在的部门
+
+	# 把修改操作设置为级联修改等级，把删除操作设置为set null等级
+	FOREIGN KEY (deptid) REFERENCES dept3 (did) ON UPDATE CASCADE ON DELETE SET NULL
+);
+
+insert into dept3 values(1001,'教学部'), (1002, '财务部'), (1003, '咨询部');
+
+# b. 在添加这条记录时，要求部门表有1001部门
+insert into emp3 values(1,'张三',1001), (2,'李四',1001), (3,'王五',1002);
+
+SELECT * FROM emp3;
+SELECT * FROM dept3;
+
+# c. 修改主表内容，从表也跟着修改
+UPDATE dept3 SET did = 1004 WHERE did = 1002;
+
+# d. 删除主表的记录，从表对应的字段将会修改为Null
+DELETE FROM dept3 WHERE did = 1004;
+/*
+mysql> SELECT * FROM emp3;
++-----+-------+--------+
+| eid | ename | deptid |
++-----+-------+--------+
+|   1 | 张三  |   1001 |
+|   2 | 李四  |   1001 |
+|   3 | 王五  |   NULL |
++-----+-------+--------+
+3 rows in set (0.00 sec)
+
+	*/
+
+# 2) 演示2：on update set null on delete cascade
+create table dept4(
+	did int primary key, #部门编号
+	dname varchar(50) #部门名称
+);
+
+create table emp4(
+	eid int primary key, #员工编号
+	ename varchar(5), #员工姓名
+	deptid int, #员工所在的部门
+
+	# 把修改操作设置为set null等级，把删除操作设置为级联删除等级
+	foreign key (deptid) references dept4(did) on update set null on delete cascade
+);
+
+insert into dept4 values(1001,'教学部');
+insert into dept4 values(1002, '财务部');
+insert into dept4 values(1003, '咨询部');
+
+insert into emp4 values(1,'张三',1001); #在添加这条记录时，要求部门表有1001部门
+insert into emp4 values(2,'李四',1001);
+insert into emp4 values(3,'王五',1002);
+
+select * from dept4;
+select * from emp4;
+
+# 修改主表，从表对应的字段设置为null
+UPDATE dept4 SET did = 1004 WHERE did = 1002;
+
+# 删除主表，从表对应的字段将会被删除
+DELETE FROM dept4 WHERE did = 1001;
+
+# 3) 演示3：on update cascade on delete cascade
+CREATE TABLE dept5(
+	did INT PRIMARY KEY,
+	dname VARCHAR(50)
+);
+
+CREATE TABLE emp5(
+	eid INT PRIMARY KEY AUTO_INCREMENT,
+	ename VARCHAR(15),
+	deptid INT,
+	
+	# 将修改操作设置为级联修改等级，把删除操作也设置为级联删除等级。
+	FOREIGN KEY (deptid) REFERENCES dept5 (did) ON UPDATE CASCADE ON DELETE CASCADE
+);
+
+insert into dept5 values(1001,'教学部'), (1002, '财务部'), (1003, '咨询部');
+insert into emp5 values(1,'张三',1001), (2,'李四',1001), (3,'王五',1002);
+
+select * from dept5;
+select * from emp5;
+
+# 修改主表，从表对应的字段自动修改
+update dept5 SET did = 1004 WHERE did = 1002;
+
+# 删除主表，从表中对应的字段也自动被删除
+DELETE FROM dept5 WHERE did = 1004;
+
+
+# 7.5 删除外键约束
+/*
+		1) 第一步先查看约束名和删除外键约束
+			 SELECT * FROM information_schema.table_constraints WHERE table_name = '表名称';#查看某个表的约束名
+
+			 ALTER TABLE 从表明 DROP FOREIGN KEY 外键约束名;
+
+		2) 第二部查看索引名和删除索引（注意，只能手动删除）
+
+			 SHOW INDEX FROM 表名称; # 查看某个表的索引名
+
+			 ALTER TABLE 从表名 DROP INDEX 索引名。
+ */
+SELECT * FROM information_schema.table_constraints WHERE table_name = 'emp5';
+
+# 1) 可以直接使用CONSTRAINT来删除指定的索引(以下两种方式均可以)
+ALTER TABLE emp5 DROP CONSTRAINT emp5_ibfk_1;
+ALTER TABLE emp5 DROP PRIMARY KEY emp5_ibfk_1;
+
+# 2) 删除索引
+SHOW INDEX FROM emp5;
+ALTER TABLE emp5 DROP INDEX deptid;
+
+
+
+## 8 小结：
+问题1：如果两个表之间有关系（一对一、一对多），比如：员工表和部门表（一对多），它们之间是否
+一定要建外键约束？
+答：不是的
+
+问题2：建和不建外键约束有什么区别？
+答：建外键约束，你的操作（创建表、删除表、添加、修改、删除）会受到限制，从语法层面受到限
+制。例如：在员工表中不可能添加一个员工信息，它的部门的值在部门表中找不到。
+不建外键约束，你的操作（创建表、删除表、添加、修改、删除）不受限制，要保证数据的引用完整
+性，只能依靠程序员的自觉，或者是在Java程序中进行限定。例如：在员工表中，可以添加一个员工的
+信息，它的部门指定为一个完全不存在的部门。
+
+问题3：那么建和不建外键约束和查询有没有关系？
+答：没有
+
+note: 在 MySQL 里，外键约束是有成本的，需要消耗系统资源。对于大并发的 SQL 操作，有可能会不适
+			合。比如大型网站的中央数据库，可能会因为外键约束的系统开销而变得非常慢。所以， MySQL 允
+			许你不使用系统自带的外键约束，在应用层面完成检查数据一致性的逻辑。也就是说，即使你不
+			用外键约束，也要想办法通过应用层面的附加逻辑，来实现外键约束的功能，确保数据的一致性
+
+
+
