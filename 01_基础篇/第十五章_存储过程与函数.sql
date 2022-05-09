@@ -322,4 +322,192 @@ DELIMITER ;
 SELECT count_by_id(50);
 
 
+## 5. 存储过程和函数的查看、修改和删除
+/*  
+		5.1 查看
+		
+	
+		5.2 修改
+		5.3 删除
+
+ */
+# 5.1 查看
+# 1) 使用SHOW CREATE语句查看存储过程和函数的创建信息
+# 可以在命令行中通过/G来查看信息
+SHOW CREATE PROCEDURE show_mgr_name;
+
+SHOW CREATE FUNCTION count_by_id;
+
+# 2) 使用show status语句查看存储过程和函数的状态信息
+SHOW PROCEDURE STATUS;
+
+SHOW PROCEDURE STATUS LIKE 'show_max_salary';
+
+SHOW FUNCTION STATUS LIKE 'email_by_id';
+
+/*
+
+mysql> SHOW CREATE FUNCTION count_by_id\G
+*************************** 1. row ***************************
+            Function: count_by_id
+            sql_mode: STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION
+     Create Function: CREATE DEFINER=`root`@`localhost` FUNCTION `count_by_id`(dept_id INT) RETURNS varchar(25) CHARSET utf8mb4
+BEGIN
+        RETURN (SELECT count(*) FROM employees WHERE department_id = dept_id);
+
+END
+character_set_client: utf8mb4
+collation_connection: utf8mb4_0900_ai_ci
+  Database Collation: utf8mb4_0900_ai_ci
+1 row in set (0.00 sec)
+
+mysql> SHOW PROCEDURE STATUS LIKE 'show_max_salary'\G
+*************************** 1. row ***************************
+                  Db: dbtest15
+                Name: show_max_salary
+                Type: PROCEDURE
+             Definer: root@localhost
+            Modified: 2022-05-09 10:16:45
+             Created: 2022-05-09 10:16:45
+       Security_type: DEFINER
+             Comment:
+character_set_client: gbk
+collation_connection: gbk_chinese_ci
+  Database Collation: utf8mb4_0900_ai_ci
+1 row in set (0.00 sec)
+
+mysql> SHOW FUNCTION STATUS LIKE 'email_by_id'\G
+*************************** 1. row ***************************
+                  Db: dbtest15
+                Name: email_by_id
+                Type: FUNCTION
+             Definer: root@localhost
+            Modified: 2022-05-09 11:26:32
+             Created: 2022-05-09 11:26:32
+       Security_type: DEFINER
+             Comment:
+character_set_client: utf8mb4
+collation_connection: utf8mb4_0900_ai_ci
+  Database Collation: utf8mb4_0900_ai_ci
+1 row in set (0.00 sec)
+
+*/
+
+# 3) 从information_schema.Routines表中查看存储过程和函数的信息
+# 此时可以不写 AND ROUTINE_TYPE = 'FUNCTION | PROCEDURE', 但是如果存储过程和存储函数重名，一定需要写，否则无法识别
+# note：在写ROUTINE_TYPE = 'FUNCTION | PROCEDURE’ 时，FUNCTION和PROCEDURE严格区分大小写。
+SELECT * FROM information_schema.ROUTINES WHERE ROUTINE_NAME = 'email_by_id'; # 和下面的查询结果相同
+SELECT * FROM information_schema.ROUTINES WHERE ROUTINE_NAME = 'email_by_id' AND ROUTINE_TYPE = 'FUNCTION';
+
+SELECT * FROM information_schema.ROUTINES WHERE ROUTINE_NAME = 'show_max_salary'; # 和下面的查询结果相同
+SELECT * FROM information_schema.ROUTINES WHERE ROUTINE_NAME = 'show_max_salary' AND ROUTINE_TYPE = 'PROCEDURE';
+
+
+# 5.2 存储过程和存储函数的修改
+/*
+		修改存储过程或函数，不影响存储过程或函数功能，只是修改相关特性。使用ALTER语句实现
+		ALTER {PROCEDURE | FUNCTION} 存储过程或函数名 [characteristic ...]
+
+		其中，characteristic指定存储过程或函数的特性，其取值信息与创建存储过程、函数时的取值信息略有不同。
+		{CONTAINS SQL | NO SQL | READS SQL DATA | MODIFIES SQL DATA}
+	  | SQL SECURITY {DEFINER | INVOKER}
+	  | COMMENT 'string'
+ */
+ALTER PROCEDURE show_max_salary 
+			READS SQL DATA 
+			SQL SECURITY INVOKER 
+			COMMENT '查询最高工资';
+
+SHOW PROCEDURE STATUS LIKE 'show_max_salary';
+/*
+	mysql> SHOW PROCEDURE STATUS LIKE 'show_max_salary'\G
+	*************************** 1. row ***************************
+										Db: dbtest15
+									Name: show_max_salary
+									Type: PROCEDURE
+							 Definer: root@localhost
+							Modified: 2022-05-09 15:08:05
+							 Created: 2022-05-09 10:16:45
+				 Security_type: INVOKER
+							 Comment: 查询最高工资
+	character_set_client: gbk
+	collation_connection: gbk_chinese_ci
+		Database Collation: utf8mb4_0900_ai_ci
+	1 row in set (0.00 sec)
+ */
+
+ALTER FUNCTION email_by_id 
+			READS SQL DATA 
+			SQL SECURITY INVOKER 
+			COMMENT '查询指定id的邮箱';
+
+SHOW FUNCTION STATUS LIKE 'email_by_id';
+/*
+	mysql> SHOW FUNCTION STATUS LIKE 'email_by_id'\G
+	*************************** 1. row ***************************
+										Db: dbtest15
+									Name: email_by_id
+									Type: FUNCTION
+							 Definer: root@localhost
+							Modified: 2022-05-09 15:09:15
+							 Created: 2022-05-09 11:26:32
+				 Security_type: INVOKER
+							 Comment: 查询指定id的邮箱
+	character_set_client: utf8mb4
+	collation_connection: utf8mb4_0900_ai_ci
+		Database Collation: utf8mb4_0900_ai_ci
+	1 row in set (0.00 sec)
+ */
+
+# 5.3 存储过程和存储函数的删除
+# 删除存储过程和函数，可以使用DROP语句，其语法结构如下：
+DROP {PROCEDURE | FUNCTION} [IF EXISTS] 存储过程或函数名
+# IF EXISTS: 如果程序或函数不存储，它可以防止发生错误，产生一个用SHOW WARNINGS查看的警告
+# 举例：
+DROP PROCEDURE CountProc; 
+DROP FUNCTION CountProc;
+
+DROP FUNCTION IF EXISTS count_by_id;
+DROP PROCEDURE IF EXISTS show_min_salary;
+
+
+## 6. 关于存储过程使用的争议
+/*
+		尽管存储过程有诸多优点，但是对于存储过程的使用，一直都存在着很多争议，比如有些公司对于大型
+		项目要求使用存储过程，而有些公司在手册中明确禁止使用存储过程，为什么这些公司对存储过程的使
+		用需求差别这么大呢？
+
+
+		6.1 优点：
+			1、存储过程可以一次编译多次使用。存储过程只在创建时进行编译，之后的使用都不需要重新编译，
+				 这就提升了 SQL 的执行效率。
+			2、可以减少开发工作量。将代码封装成模块，实际上是编程的核心思想之一，这样可以把复杂的问题
+				 拆解成不同的模块，然后模块之间可以重复使用，在减少开发工作量的同时，还能保证代码的结构清晰。
+			3、存储过程的安全性强。我们在设定存储过程的时候可以设置对用户的使用权限，这样就和视图一样具有较强的安全性。
+			4、可以减少网络传输量。因为代码封装到存储过程中，每次使用只需要调用存储过程即可，这样就减少了网络传输量。
+			5、良好的封装性。在进行相对复杂的数据库操作时，原本需要使用一条一条的 SQL 语句，可能要连接
+				 多次数据库才能完成的操作，现在变成了一次存储过程，只需要连接一次即可。
+
+
+		6.2 缺点：
+			基于上面这些优点，不少大公司都要求大型项目使用存储过程，比如微软、IBM 等公司。但是国内的阿
+			里并不推荐开发人员使用存储过程，这是为什么呢？
+
+			存储过程虽然有诸如上面的好处，但缺点也是很明显的。
+				1、可移植性差。存储过程不能跨数据库移植，比如在 MySQL、Oracle 和 SQL Server 里编写的存储过
+					 程，在换成其他数据库时都需要重新编写。
+				2、调试困难。只有少数 DBMS 支持存储过程的调试。对于复杂的存储过程来说，开发和维护都不容
+					 易。虽然也有一些第三方工具可以对存储过程进行调试，但要收费。
+				3、存储过程的版本管理很困难。比如数据表索引发生变化了，可能会导致存储过程失效。我们在开发
+					 软件的时候往往需要进行版本管理，但是存储过程本身没有版本控制，版本迭代更新的时候很麻烦。
+				4、它不适合高并发的场景。高并发的场景需要减少数据库的压力，有时数据库会采用分库分表的方
+					 式，而且对可扩展性要求很高，在这种情况下，存储过程会变得难以维护， 增加数据库的压力，显然就
+					 不适用了。
+
+
+		小结：
+		存储过程既方便，又有局限性。尽管不同的公司对存储过程的态度不一，但是对于我们开发人员来说，
+		不论怎样，掌握存储过程都是必备的技能之一。
+*/
+
 
