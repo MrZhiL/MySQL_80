@@ -16,10 +16,10 @@
 
 # 1.1 查看系统变量
 # 1) 查看所有系统变量
-SHOW GLOBAL VARIABLES;
+SHOW GLOBAL VARIABLES; # 624
 
 # 2) 查看所有会话变量
-SHOW SESSION VARIABLES;
+SHOW SESSION VARIABLES; # 647
 SHOW VARIABLES; # 和上面的结果一样，默认查询的是会话系统变量
 
 # 3) 查看满足条件的部门系统变量
@@ -438,4 +438,161 @@ DELIMITER ;
 
 CALL InsertDataWithCondition();
 SELECT @x, @proc_value; # 1, -1
+
+## 4. 流程控制
+/*
+		解决复杂问题不可能通过一个SQL语句完成，我们需要执行多个SQL操作。
+		流程控制语句的作用就是控制存储过程中SQL语句的执行顺序，使我们完成
+		复杂操作必不可少的一部分。只要是执行的程序，流程就分为三大类：
+
+			* 顺序结构：程序从上往下依次执行
+			* 分支结构：程序按照条件进行选择执行，从两条或多条路径中选择一条执行
+			* 循环结构：程序满足一定条件下，重复执行一组语句
+
+		针对于MySQL的流程控制语句主要有3类。注意：只能用于存储程序。
+			1) 条件判断语句：IF语句和CASE语句
+			2) 循环语句：LOOP、WHILE和REPEAT语句
+			3) 跳转语句：ITERATE和LEAVE语句。
+ */
+# 4.1 分支结构 - IF
+/* IF语句的语法结构是：
+	
+	 IF 表达式1 THEN 操作1
+	 [ELSEIF 表达式2 THEN 操作2] .....
+	 [ELSE 操作N]
+	 END IF
+
+	 根据表达式的结果为TRUE或FALSE执行相应的语句。这里[]中的内容是可选的。
+
+	 特点：不同的表达式对应不同的操作；
+				 使用在begin end中
+
+ */
+# 举例1：
+DROP PROCEDURE IF EXISTS test_if;
+
+DELIMITER //
+CREATE PROCEDURE test_if()
+BEGIN
+		# NOTE: 所有的变量声明必须在存储过程的开始处
+		DECLARE stu_name VARCHAR(15);
+		DECLARE email VARCHAR(25) DEFAULT 'xxx@sina.com';
+		DECLARE age INT DEFAULT(20);
+
+		# case1:
+		IF stu_name IS NULL THEN SELECT 'stu_name is null';
+		END IF;
+		
+		# case2:
+		IF email is NULL THEN SELECT 'email is null';
+		ELSE SELECT email; #CONCAT('email is : ', email);
+		END IF;
+
+		# case3:
+		IF age > 40 THEN SELECT '中年';
+		ELSEIF age > 18 THEN SELECT '青年';
+		ELSEIF age > 12 THEN SELECT '少年';
+		ELSE SELECT '幼年';
+		END IF;
+
+END //
+DELIMITER ;
+
+CALL test_if();
+
+# 举例2：声明存储过程“update_salary_by_eid1”，定义IN参数emp_id，输入员工编号。判断该员工
+#				 薪资如果低于8000元并且入职时间超过5年，就涨薪500元；否则就不变。
+DELIMITER //
+CREATE PROCEDURE update_salary_by_eid1(IN emp_id INT)
+BEGIN
+		# 定义变量
+		DECLARE emp_sal DOUBLE; # 用来记录员工的薪资
+		DECLARE hire_year DOUBLE; # 用来记录员工工作的年限
+
+		SELECT salary INTO emp_sal FROM employees WHERE employee_id = emp_id;
+		SELECT DATEDIFF(CURDATE(),hire_date)/365 INTO hire_year FROM employees WHERE employee_id = emp_id;
+
+		# IF语句进行判断
+		IF emp_sal < 8000 AND hire_year >= 5 
+				THEN UPDATE employees SET salary = salary + 500 WHERE employee_id = emp_id;
+		END IF;		
+		
+END //
+DELIMITER ;
+
+# 查看薪资低于8000且工作年限大于5的工作人员
+SELECT DATEDIFF(CURDATE(),hire_date)/365 hire_year, employee_id, last_name, salary, hire_date 
+FROM employees 
+WHERE salary < 8000 AND DATEDIFF(CURDATE(),hire_date)/365 >= 5;
+
+# 调用update_salary_by_eid1
+CALL update_salary_by_eid1(104); # 104的salary从6000->6500
+
+# 举例3：声明存储过程“update_salary_by_eid2”，定义IN参数emp_id，输入员工编号。判断该员工
+# 			 薪资如果低于9000元并且入职时间超过5年，就涨薪500元；否则就涨薪100元。
+DELIMITER //
+CREATE PROCEDURE update_salary_by_eid2(IN emp_id INT)
+BEGIN
+		# 定义变量
+		DECLARE emp_sal DOUBLE; # 用来记录员工的薪资
+		DECLARE hire_year DOUBLE; # 用来记录员工工作的年限
+
+		SELECT salary INTO emp_sal FROM employees WHERE employee_id = emp_id;
+		SELECT DATEDIFF(CURDATE(),hire_date)/365 INTO hire_year FROM employees WHERE employee_id = emp_id;
+
+		# IF语句进行判断
+		IF emp_sal < 9000 AND hire_year >= 5 
+				THEN UPDATE employees SET salary = salary + 500 WHERE employee_id = emp_id;
+		ELSE UPDATE employees SET salary = salary + 100 WHERE employee_id = emp_id;
+		END IF;		
+		
+END //
+DELIMITER ;
+
+# 查看薪资低于8000且工作年限大于5的工作人员
+SELECT DATEDIFF(CURDATE(),hire_date)/365 hire_year, employee_id, last_name, salary, hire_date 
+FROM employees 
+WHERE salary < 9000 AND DATEDIFF(CURDATE(),hire_date)/365 >= 5;
+
+# 调用update_salary_by_eid1
+CALL update_salary_by_eid2(104); # 104的salary从6500->7000
+CALL update_salary_by_eid2(103); # 103的salary从9000->9100
+
+# 举例4：声明存储过程“update_salary_by_eid3”，定义IN参数emp_id，输入员工编号。判断该员工
+#				 薪资如果低于9000元，就更新薪资为9000元；薪资如果大于等于9000元且低于10000的，但是奖金
+# 			 比例为NULL的，就更新奖金比例为0.01；其他的涨薪100元。
+DELIMITER //
+CREATE PROCEDURE update_salary_by_eid3(IN emp_id INT)
+BEGIN
+		# 定义变量
+		DECLARE emp_sal DOUBLE; # 用来记录员工的薪资
+		DECLARE bound DOUBLE;   # 用来记录员工的奖金比例
+
+		SELECT salary INTO emp_sal FROM employees WHERE employee_id = emp_id;
+		SELECT commission_pct INTO bound FROM employees WHERE employee_id = emp_id;
+
+		# IF语句进行判断
+		IF emp_sal < 9000
+				THEN UPDATE employees SET salary = 9000 WHERE employee_id = emp_id;
+		ELSEIF emp_sal < 10000 AND bound IS NULL
+				THEN UPDATE employees SET commission_pct = 0.1 WHERE employee_id = emp_id;
+		ELSE 
+				UPDATE employees SET salary = salary + 100 WHERE employee_id = emp_id;
+		END IF;		
+		
+END //
+DELIMITER ;
+
+# 查看员工信息
+SELECT * FROM employees WHERE employee_id IN (102, 103, 104);
+
+# 调用update_salary_by_eid1
+CALL update_salary_by_eid3(102); # 102的salary从17100->17200
+CALL update_salary_by_eid3(103); # 103的commission_pct从0->0.1
+CALL update_salary_by_eid3(104); # 104的salary从7000->9100
+
+
+# 4.2 分支结构 - CASE
+
+
 
