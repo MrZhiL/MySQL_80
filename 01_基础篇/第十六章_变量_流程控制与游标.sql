@@ -575,7 +575,7 @@ BEGIN
 		IF emp_sal < 9000
 				THEN UPDATE employees SET salary = 9000 WHERE employee_id = emp_id;
 		ELSEIF emp_sal < 10000 AND bound IS NULL
-				THEN UPDATE employees SET commission_pct = 0.1 WHERE employee_id = emp_id;
+				THEN UPDATE employees SET commission_pct = 0.01 WHERE employee_id = emp_id;
 		ELSE 
 				UPDATE employees SET salary = salary + 100 WHERE employee_id = emp_id;
 		END IF;		
@@ -593,6 +593,125 @@ CALL update_salary_by_eid3(104); # 104的salary从7000->9100
 
 
 # 4.2 分支结构 - CASE
+/*
+		# CASE语句的语法结构1：类似于switch
+				CASE 表达式
+				WHEN 值1 THEN 结果1或语句1(如果是语句，需要加分号)
+				WHEN 值2 THEN 结果2或语句2(如果是语句，需要加分号)
+				...
+				ELSE 结果n或语句n(如果是语句，需要加分号)
+				END [case]（如果是放在begin end中需要加上case，如果放在select后面不需要）
+
+		# CASE语句的语法结构2：类似于多重IF
+				CASE
+				WHEN 条件1 THEN 结果1或语句1(如果是语句，需要加分号)
+				WHEN 条件2 THEN 结果2或语句2(如果是语句，需要加分号)
+				...
+				ELSE 结果n或语句n(如果是语句，需要加分号)
+				END [case]（如果是放在begin end中需要加上case，如果放在select后面不需要）
+ */
+# 举例1：使用CASE流程控制语句的第2种格式，判断val1和val2值的大小。
+DELIMITER //
+CREATE PROCEDURE test_case1() 
+BEGIN
+		# 定义局部变量
+		DECLARE val1, val2 INT;
+		SET val1 = 100;
+		set val2 = 10;
+
+		# 使用case语句进行判断
+		CASE WHEN val1 > val2 THEN SELECT CONCAT(val1, ' > ', val2);
+				 WHEN val1 < val2 THEN SELECT CONCAT(val1, ' < ', val2);
+				 ELSE SELECT CONCAT(val1, ' = ', val2);
+		END CASE; # 在begin ... end语句中需要使用end case; 在select语句中使用end（无case）
+END //
+DELIMITER ;
+
+CALL test_case1();
+
+# 举例2：使用CASE流程控制语句的第1种格式，判断val值等于1、等于2，或者两者都不等。
+DELIMITER //
+CREATE PROCEDURE test_case2(IN val INT)
+BEGIN
+		# 定义变量
+-- 		DECLARE val INT DEFAULT(2);
+
+		# case语句
+		case val WHEN 1 THEN SELECT 'val is 1';
+						 WHEN 2 THEN SELECT 'val is 2';
+						 WHEN 3 THEN SELECT 'val is 3';
+						 ELSE SELECT 'val greater 3';
+		END CASE;
+END //
+DELIMITER ;
+
+CALL test_case2(1);
+CALL test_case2(2);
+CALL test_case2(3);
+CALL test_case2(10);
+
+# 举例3：声明存储过程“update_salary_by_eid4”，定义IN参数emp_id，输入员工编号。判断该员工
+#				 薪资如果低于9000元，就更新薪资为9000元；薪资大于等于9000元且低于10000的，但是奖金比例
+#				 为NULL的，就更新奖金比例为0.01；其他的涨薪100元。
+DROP PROCEDURE update_salary_by_eid4;
+
+DELIMITER //
+CREATE PROCEDURE update_salary_by_eid4(IN emp_id INT)
+BEGIN
+		# 定义变量
+		DECLARE emp_sal DOUBLE;
+		DECLARE bound INT;
+
+		SELECT salary INTO emp_sal FROM employees WHERE employee_id = emp_id;
+		SELECT commission_pct INTO bound FROM employees WHERE employee_id = emp_id;
+		
+		# 使用case语句进行判断
+		CASE WHEN emp_sal < 9000 THEN UPDATE employees SET salary = 9000 WHERE employee_id = emp_id;
+				 WHEN emp_sal < 10000 AND bound IS NULL	
+														 THEN UPDATE employees SET commission_pct = 0.01 WHERE employee_id = emp_id;
+				 ELSE UPDATE employees SET salary = salary + 100 WHERE employee_id = emp_id;
+		END case;
+
+END // 
+DELIMITER ;
+
+SELECT * FROM employees WHERE employee_id in (103, 104, 105);
+
+CALL update_salary_by_eid4(103); # salary = 9200->9300
+CALL update_salary_by_eid4(104); # commission_Pct = 0->0.1
+CALL update_salary_by_eid4(105); # salary = 4800->9000
 
 
+# 举例4：声明存储过程update_salary_by_eid5，定义IN参数emp_id，输入员工编号。判断该员工的
+#				 入职年限，如果是0年，薪资涨50；如果是1年，薪资涨100；如果是2年，薪资涨200；如果是3年，
+#				 薪资涨300；如果是4年，薪资涨400；其他的涨薪500。
+DROP PROCEDURE update_salary_by_eid5;
+
+DELIMITER //
+CREATE PROCEDURE update_salary_by_eid5(IN emp_id INT)
+BEGIN
+		# 定义变量
+		DECLARE hire_year INT;
+
+		SELECT FLOOR(DATEDIFF(CURDATE(), hire_date)/365) INTO hire_year FROM employees WHERE employee_id = emp_id;
+		
+		# 使用case语句进行判断
+		CASE hire_year WHEN 0 THEN UPDATE employees SET salary = salary + 50 WHERE employee_id = emp_id;
+									 WHEN 1 THEN UPDATE employees SET salary = salary + 100 WHERE employee_id = emp_id;
+									 WHEN 2 THEN UPDATE employees SET salary = salary + 200 WHERE employee_id = emp_id;
+									 WHEN 3 THEN UPDATE employees SET salary = salary + 300 WHERE employee_id = emp_id;
+									 WHEN 4 THEN UPDATE employees SET salary = salary + 400 WHERE employee_id = emp_id;
+									 ELSE UPDATE employees SET salary = salary + 500 WHERE employee_id = emp_id;
+		END case;
+
+END // 
+DELIMITER ;
+
+SELECT DATEDIFF(CURDATE(),hire_date)/365 hire_year, employee_id, last_name, salary, hire_date 
+FROM employees 
+
+CALL update_salary_by_eid5(100);
+CALL update_salary_by_eid5(101);
+CALL update_salary_by_eid5(102);
+CALL update_salary_by_eid5(103);
 
