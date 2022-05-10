@@ -1,4 +1,4 @@
-## 第十六章 变量、流程控制与游标
+## 第十六章 - 1 变量、流程控制与游标
 /* 
 		date: 2022-05-09
 		author: mr.zhi
@@ -266,4 +266,176 @@ CALL different_salary(@emp_id, @dif_salary);
 SELECT @dif_salary;
 
 
+
+## 3. 定义条件与处理程序
+/*
+		定义条件时事先定义程序执行过程中可能遇到的问题。
+		处理程序定义了在遇到问题时应当采取的处理方式，并且保证存储过程或函数在遇到警告或错误时能继续执行。
+		这样可以增强存储处理问题的能力，避免程序异常停止运行。
+
+		说明：定义条件和处理程序在存储过程、存储函数中都是支持的。
+	
+
+		3.1 定义条件
+		
+				定义条件就是给MySQL中的错误码命名，这有助于存储的程序代码更清晰。他将一个错误名字和指定的错误条件关联起来。
+				这个名字可以随后被用在定义处理程序的DECLARE HANDLER语句中。
+
+				定义条件使用DECLARE语句，语法格式如下：
+				DECLARE 错误名称CONDITION FOR 错误码 (或错误条件)
+
+				错误码的说明：
+					1) MySql_error_code 和 salstate_value都可以表示MySQL的错误
+							* MySQL_error_code是数值类型错误代码。
+							* sqlstate_value是长度为5的字符串类型错误代码。
+					
+					2) 例如，在ERROR 1418(HY000)中，1418是MySql_error_code，’HY000‘是salstate_value。
+					3) 例如，在ERROR 1142(42000)中，1142是MySQL_error_code，'42000'是sqlstate_value。
+ */
+# 3.1 案例分析
+DELIMITER //
+CREATE PROCEDURE UpdateDataNoCondition()
+BEGIN
+		SET @x = 1;
+		UPDATE employees SET email = NULL WHERE last_name = 'Abel';
+		SET @x = 2;
+		UPDATE employees SET email = 'aabbel' WHERE last_name = 'Abel';
+		SET @x = 3;
+END //
+DELIMITER ;
+
+# 测试上述案例：
+# ERROR 1048 (23000): Column 'email' cannot be null: 1048为数值类型错误代码；23000位长度为5的字符串类型错误代码
+CALL UpdateDataNoCondition();
+
+SELECT @x;
+
+
+# 3.2 定义条件
+# 格式: DECLARE 错误名称 CONDITION FOR 错误码(或错误条件)
+# 举例1：定义“Field_Not_Be_NULL”错误名与MySQL中违反非空约束的错误类型是“ERROR 1048 (23000)”对应。
+# 方式1：使用MySQL_error_code
+DECLARE Field_Not_Be_NULL CONDITION FOR 1048;
+
+# 方式2：使用sqlstate_value, 加上sqlstate关键字可以避免引起歧义
+DECLARE Field_Not_Be_NULL CONDITION FOR SQLSTATE '23000';
+
+# 举例2：定义"ERROR 1148(42000)"错误，名称为command_not_allowed。
+DECLARE command_not_allowed CONDITION FOR 1148;
+DECLARE command_not_allowed CONDITION FOR SQLSTATE '42000';
+
+
+# 3.2 定义处理程序
+/*
+	可以为SQL执行过程中发生的某种类型的错误定义特殊的处理程序。定义处理程序时，使用DECLARE语句的语法如下：
+	
+	DECLARE 处理方式 HANDLER FOR 错误类型 处理语句
+
+	1) 处理方式：处理方式有3个取值：CONTINUE、EXIT、UNDO。
+			* CONTINUE ：表示遇到错误不处理，继续执行。
+			* EXIT ：表示遇到错误马上退出。
+			* UNDO ：表示遇到错误后撤回之前的操作。MySQL中暂时不支持这样的操作。
+	2) 错误类型（即条件）可以有如下取值：
+			* SQLSTATE '字符串错误码' ：表示长度为5的sqlstate_value类型的错误代码；
+			* MySQL_error_code ：匹配数值类型错误代码；
+			* 错误名称：表示DECLARE ... CONDITION定义的错误条件名称。
+			* SQLWARNING ：匹配所有以01开头的SQLSTATE错误代码；
+			* NOT FOUND ：匹配所有以02开头的SQLSTATE错误代码；
+			* SQLEXCEPTION ：匹配所有没有被SQLWARNING或NOT FOUND捕获的SQLSTATE错误代码；
+	3) 处理语句：如果出现上述条件之一，则采用对应的处理方式，并执行指定的处理语句。
+		 语句可以是像“ SET 变量 = 值”这样的简单语句，也可以是使用BEGIN ... END 编写的复合语句。
+	
+
+	定义处理程序的几种方式，代码如下：
+	#方法1：捕获sqlstate_value
+	DECLARE CONTINUE HANDLER FOR SQLSTATE '42S02' SET @info = 'NO_SUCH_TABLE';
+
+	#方法2：捕获mysql_error_value
+	DECLARE CONTINUE HANDLER FOR 1146 SET @info = 'NO_SUCH_TABLE';
+
+	#方法3：先定义条件，再调用
+	DECLARE no_such_table CONDITION FOR 1146;
+	DECLARE CONTINUE HANDLER FOR NO_SUCH_TABLE SET @info = 'NO_SUCH_TABLE';
+
+	#方法4：使用SQLWARNING
+	DECLARE EXIT HANDLER FOR SQLWARNING SET @info = 'ERROR';
+
+	#方法5：使用NOT FOUND
+	DECLARE EXIT HANDLER FOR NOT FOUND SET @info = 'NO_SUCH_TABLE';
+
+	#方法6：使用SQLEXCEPTION
+	DECLARE EXIT HANDLER FOR SQLEXCEPTION SET @info = 'ERROR';
+ */
+# 3.3 案例分析：
+# 案例1：在存储过程中，定义处理程序，捕获sqlstate_value值，当遇到MySQL_error_code值为1048时，执行
+#				 CONTINUE操作，并且将@proc_value的值设置为-1。
+DELIMITER //
+CREATE PROCEDURE sqlstate_value()
+BEGIN
+			# 方式1：
+			DECLARE CONTINUE HANDLER FOR 1048 SET @proc_value = -1;
+			# 方式2：
+			-- DECLARE CONTINUE HANDLER FOR SQLSTATE '23000' SET @proc_value = -1;
+
+			SET @x = 1;
+			UPDATE employees SET email = NULL WHERE last_name = 'Abel';
+			SET @x = 2;
+			UPDATE employees SET email = 'aabbel' WHERE last_name = 'Abel';
+			SET @x = 3;
+END //
+DELIMITER ;
+
+CALL sqlstate_value();
+select @x, @proc_value; # 3, -1
+
+# 案例2：创建一个名称为“InsertDataWithCondition”的存储过程，代码如下。
+# 			 在存储过程中，定义处理程序，捕获sqlstate_value值，当遇到sqlstate_value值为23000时，执行EXIT操
+#				 作，并且将@proc_value的值设置为-1。
+# 步骤1: 准备工作
+DESC departments;
+ALTER TABLE departments ADD CONSTRAINT uk_dept_id UNIQUE(department_id);
+
+# 步骤2：没有处理程序之前
+DELIMITER //
+CREATE PROCEDURE InsertDataWithCondition()
+BEGIN	
+
+		SET @x = 1;
+		INSERT INTO departments(department_name) VALUES('测试');
+		SET @x = 2;
+		INSERT INTO departments(department_name) VALUES('测试');
+		SET @x = 3;
+END //
+DELIMITER ;
+
+# ERROR 1062 (23000): Duplicate entry '0' for key 'departments.uk_dept_id'
+CALL InsertDataWithCondition();
+SELECT @x; # 2
+
+# 步骤3：移除InsertDataWithCondition
+DROP PROCEDURE InsertDataWithCondition;
+
+# 步骤4：添加处理程序
+DELIMITER //
+CREATE PROCEDURE InsertDataWithCondition()
+BEGIN	
+		
+		# 处理程序
+		# 方式1
+		-- DECLARE EXIT HANDLER FOR SQLSTATE '23000' SET @proc_value = -1;
+
+		# 方式2
+		DECLARE duplicate_entry CONDITION FOR SQLSTATE '23000';
+		DECLARE EXIT HANDLER FOR duplicate_entry SET @proc_value = -1; 
+
+		SET @x = 1;
+		INSERT INTO departments(department_name) VALUES('测试'); # 上面的案例中已经运行过改行代码，因此这里再次运行的时候将会报错
+		SET @x = 2;
+		INSERT INTO departments(department_name) VALUES('测试');
+		SET @x = 3;
+END //
+DELIMITER ;
+
+CALL InsertDataWithCondition();
+SELECT @x, @proc_value; # 1, -1
 
