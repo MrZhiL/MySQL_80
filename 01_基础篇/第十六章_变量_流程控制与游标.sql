@@ -913,3 +913,233 @@ CALL update_salary_repeat(@num);
 SELECT @num;
 
 SELECT AVG(salary) FROM employees;
+
+
+
+## 5.1 跳转语句之LEAVE语句
+/*
+		LEAVE语句：可以用在循环语句内，或者以 BEGIN 和 END 包裹起来的程序体内，表示跳出循环或者跳出
+							 程序体的操作。如果你有面向过程的编程语言的使用经验，你可以把 LEAVE 理解为 break。
+							 基本格式如下
+				
+								LEAVE 标记名
+								
+								其中，label参数表示循环的标志。LEAVE和BEGIN ... END或循环一起被使用。
+		
+ */
+/*
+	举例1:创建存储过程 “leave_begin()”，声明INT类型的IN参数num。给BEGIN...END加标记名，并在
+				BEGIN...END中使用IF语句判断num参数的值。
+				如果num<=0，则使用LEAVE语句退出BEGIN...END；
+				如果num=1，则查询“employees”表的平均薪资；
+				如果num=2，则查询“employees”表的最低薪资；
+				如果num>2，则查询“employees”表的最高薪资。
+				IF语句结束后查询“employees”表的总人数。
+ */
+DELIMITER //
+CREATE PROCEDURE leave_begin(IN num INT)
+begin_label : BEGIN
+		IF num <= 0 THEN LEAVE begin_label;
+			ELSEIF num = 1 THEN SELECT AVG(salary) FROM employees;
+			ELSEIF num = 2 THEN SELECT MIN(salary) FROM employees;
+			ELSE SELECT MAX(salary) FROM employees;
+		END IF;
+
+		SELECT count(*) FROM employees;
+END //
+DELIMITER ;
+
+CALL leave_begin(0);
+CALL leave_begin(1);
+CALL leave_begin(2);
+
+
+# 举例2：当市场环境不好时，公司为了渡过难关，决定暂时降低大家的薪资。声明存储过程“leave_while()”，声明
+#				 OUT参数num，输出循环次数，存储过程中使用WHILE循环给大家降低薪资为原来薪资的90%，直到全公
+# 			 司的平均薪资小于等于10000，并统计循环次数。
+DROP PROCEDURE leave_while;
+
+DELIMITER //
+CREATE PROCEDURE leave_while(OUT num INT)
+BEGIN
+		DECLARE avg_sal DOUBLE;
+		DECLARE count INT DEFAULT 0;
+
+		SELECT AVG(salary) INTO avg_sal FROM employees;
+
+		while_label : WHILE TRUE DO
+				IF avg_sal <= 10000 THEN LEAVE while_label;
+				END IF;
+
+				SET count = count + 1;
+
+				UPDATE employees set salary = salary * 0.9;
+
+				SELECT AVG(salary) INTO avg_sal FROM employees;
+		END WHILE;
+
+		set num = count;
+END //
+DELIMITER ;
+
+CALL leave_while(@num);
+SELECT @num;
+
+SELECT AVG(salary) FROM employees;
+
+
+## 5.2 跳转语句之ITERATE语句
+/* 
+		ITERATE语句：只能用在循环语句（LOOP、REPEAT和WHILE语句）内，表示重新开始循环，将执行顺序
+		转到语句段开头处。如果你有面向过程的编程语言的使用经验，你可以把 ITERATE 理解为 continue，意
+		思为“再次循环”。
+		
+		ITERATE label;
+
+		label参数表示循环的标志。Iterator语句必须跟在循环标志前面。
+
+	# 举例：定义局部变量num，初始值为0。循环结构中执行num + 1操作。
+					如果num < 10，则继续执行循环；
+					如果num > 15，则退出循环结构；
+		
+ */
+DROP PROCEDURE test_iterate;
+
+DELIMITER //
+CREATE PROCEDURE test_iterate()
+BEGIN
+		DECLARE num INT DEFAULT 0;
+
+		loop_label: LOOP
+				SET num = num + 1;
+
+				IF num < 10 THEN ITERATE loop_label;
+				ELSEIF num > 15 THEN LEAVE loop_label;
+				END IF;
+
+				SELECT num;
+
+		END LOOP;
+END //
+DELIMITER ;
+
+CALL test_iterate();
+
+
+## 6. 游标的使用
+/*
+		6.1 什么是游标（或光标）
+				虽然我们可以通过筛选条件WHERE和HAVING，或者是限定返回记录的关键字LIMIT返回一条记录，但是，
+				却无法在结果集中像指针一样，向前定位一条记录、向后定位一条记录，或者是随意定位到某一条记录，
+				并对记录的数据进行处理。
+
+				这个时候，就可以用到游标。游标，提供了一种灵活的操作方式，让我们能够对结果集中的每一条记录进行定位，
+				并对指向的记录中的数据进行操作的数据结构。游标让SQL这种面向集合的语言有了面向过程开发的能力。
+				
+				
+				在SQL中，游标是一种临时的数据库对象，可以指向存储在数据库表中的数据行指针。这里游标充当了指针的作用，
+				我们可以通过操作游标来对数据行进行操作。
+				
+				MySQL中游标可以在存储过程和函数中使用。
+				
+				比如，我们查询employees表中工资高于15000的员工都有哪些：
+					SELECT employee_id, last_name, salary FROM employees WHERE salary > 15000;
+				
+
+		6.2 使用游标步骤
+				
+				游标必须在声明处理程序之前被声明，并且变量和条件还必须在声明游标或处理程序之前被声明。
+
+				如果我们想要使用游标，一般需要经历四个步骤。不同的DBMS中，使用游标的语法可能略有不同。
+				
+				
+			第一步：声明游标
+
+					在MySQL中，使用DECLARE关键字来声明游标，其语法的基本形式如下：
+						DECLARE cursor_name CURSOR FOR select_statement;
+
+					这个语法适用于MySQL、SQL Server，DB2和MariaDB。如果是用Oracle或者PostgreSQL，需要写出：
+						DECLARE cursor_name CURSOR IS select_statement;
+
+					要使用select语句来获取数据结果集，而此时还没有开始遍历数据，这里select_statement代表的是select语句，
+					返回一个用于创建游标的结果集。
+
+					例如：DECLARE cur_emp CURSOR FOR SELECT employee_id, salary FROM employees;
+
+								DECLARE cursor_fruit CURSOR FOR SELECT f_name, f_price FROM fruits;
+					
+			第二步：打开游标
+					打开游标的语法如下：OPEN cursor_name
+
+				  当我们定义好游标之后，如果想要使用游标，必须先打开游标。打开游标的时候select语句的
+					查询结果集就会送到游标工作区，为后面游标的`逐条读取`结果集中的记录做准备。
+					
+					例如：OPEN cur_emp;
+
+			第三步：使用游标（从游标中取得数据）
+					语法格式：FETCH cursor_name INTO var_name [, var_name] ...
+
+					这句的作用是使用cursor_name这个游标来读取当前行，并且将数据保存到var_name这个变量中，
+					游标指针指到下一行。如果游标读取的数据行有多个列名，则在InTO关键字后面赋值给多个变量名即可。
+
+					注意：vaar_name必须在声明游标之前就定义好。
+
+					FETCH cur_emp INTO emp_id, emp_sal;
+					
+					注意：游标的查询结果集中的字段数，必须跟INTO后面的变量数一直，否则，在存储过程执行的时候，MySQL会提示错误。
+
+			第四步：关闭游标
+					语法格式：CLOSE cursor_name;
+
+					有 OPEN 就会有 CLOSE，也就是打开和关闭游标。当我们使用完游标后需要关闭掉该游标。因为游标会
+					占用系统资源，如果不及时关闭，游标会一直保持到存储过程结束，影响系统运行的效率。而关闭游标
+					的操作，会释放游标占用的系统资源。
+				
+					note: 关闭游标之后，我们就不能再检索查询结果中的数据行，如果需要检索只能再次打开游标。
+
+					CLOSE cur_emp;
+ */
+
+# 举例：创建存储过程“get_count_by_limit_total_salary()”，声明IN参数 limit_total_salary，DOUBLE类型；声明
+# 			OUT参数total_count，INT类型。函数的功能可以实现累加薪资最高的几个员工的薪资值，直到薪资总和
+# 			达到limit_total_salary参数的值，返回累加的人数给total_count。
+
+DELIMITER //
+CREATE PROCEDURE get_count_by_limit_total_salary(IN limit_total_salary DOUBLE, OUT total_count INT)
+BEGIN
+		# 定义变量
+		DECLARE sum_sal DOUBLE DEFAULT 0.0; # 用来记录统计的总的薪资
+		DECLARE count INT DEFAULT 0; # 用来记录统计的员工个数
+		DECLARE emp_sal DOUBLE;  # 用来记录某个员工的薪资
+
+		# 6.1 创建游标
+		DECLARE cursor_emp CURSOR FOR 
+		SELECT salary FROM employees ORDER BY salary DESC;
+
+		# 6.2 打开游标
+		OPEN cursor_emp;
+
+		WHILE sum_sal < limit_total_salary DO
+				# 6.3 使用游标
+				FETCH cursor_emp INTO emp_sal;
+			
+				SET sum_sal = sum_sal + emp_sal;
+
+				SET count = count + 1;
+				
+		END WHILE;
+		
+		# 6.4 关闭游标
+		CLOSE cursor_emp;
+
+		SET total_count = count;
+END //
+DELIMITER ;
+
+CALL get_count_by_limit_total_salary(200000, @num);
+SELECT @num;
+
+DROP VIEW emp_sal;
+CREATE VIEW emp_sal AS SELECT salary FROM employees ORDER BY salary DESC LIMIT 0, 14;
+SELECT sum(salary) from emp_sal;
+
