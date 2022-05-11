@@ -11,6 +11,26 @@
 
 	 
 		2. 系统变量
+
+	  补充：MySQL8.0的新特性——全局变量的持久化
+
+		在MySQL数据库中，全局变量可以通过SET GLOBAL语句来设置。例如，设置服务器语句超时的限制，可
+		以通过设置系统变量max_execution_time来实现：
+
+				SET GLOBAL MAX_EXECUTION_TIME=2000;
+	
+		使用SET GLOBAL语句设置的变量值只会临时生效。数据库重启后，服务器又会从MySQL配置文件中读取
+		变量的默认值。 MySQL 8.0版本新增了SET PERSIST 命令。例如，设置服务器的最大连接数为1000：
+
+				SET PERSIST global max_connections = 1000;
+
+		MySQL会将该命令的配置保存到数据目录下的mysqld-auto.cnf 文件中，下次启动时会读取该文件，用
+		其中的配置来覆盖默认的配置文件。
+				查看全局变量max_connections的值: show variables like '%max_connections%';
+				设置全局变量max_connections的值：set persist max_connections=1000;
+
+		重启MySQL服务器，再次查询max_connections的值，可以发现已经改变了。
+
  */
 ## 1. 系统变量
 
