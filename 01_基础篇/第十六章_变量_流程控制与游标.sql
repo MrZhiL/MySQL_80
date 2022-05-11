@@ -715,3 +715,201 @@ CALL update_salary_by_eid5(101);
 CALL update_salary_by_eid5(102);
 CALL update_salary_by_eid5(103);
 
+
+## 4.3 循环结构之 LOOP
+/*
+	LOOP 循环语句用来重复执行某些语句。LOOP内的语句一直重复执行知道循环被退出(使用LEAVE子句)，跳出循环过程。
+
+	LOOP语句的基本格式如下：
+	
+	[loop_label:] LOOP
+			循环执行的语句
+	END LOOP [loop_label]
+
+	其中，loop_label表示LOOP语句的标注名称，该参数可以省略。
+
+	note: 1. 这三种循环（loop、repeat、while）都可以省略名称，但如果循环中添加了循环控制语句（LEAVE或ITERATE）则必须添加名称。 
+				2. LOOP：一般用于实现简单的"死"循环 
+					 WHILE：先判断后执行 
+					 REPEAT：先执行后判断，无条件至少执行一次
+ */
+# 举例1：loop循环测试
+DELIMITER //
+CREATE PROCEDURE test_loop()
+BEGIN
+		# 定义变量
+		DECLARE num INT DEFAULT(0);
+
+		# 使用LOOP循环
+		loop_label : LOOP
+			 SET num = num + 1;
+			 IF num >= 10 THEN LEAVE loop_label;
+			 END IF;
+		END LOOP loop_label;
+
+		# 查看局部变量
+		SELECT num;
+END //
+DELIMITER ;
+
+CALL test_loop();
+
+# 举例2：当市场环境变好时，公司为了奖励大家，决定给大家涨工资。声明存储过程
+#				 “update_salary_loop()”，声明OUT参数num，输出循环次数。存储过程中实现循环给大家涨薪，薪资涨为
+#			   原来的1.1倍。直到全公司的平均薪资达到12000结束。并统计循环次数。
+DELIMITER //
+CREATE PROCEDURE update_salary_loop(OUT num INT)
+BEGIN
+		# 定义局部变量（因为num的值可能不是0，因此这里多定义了一个局部变量，用来记录）
+		DECLARE avg_sal DOUBLE; 	# 用来记录平均工资
+		DECLARE loop_count INT DEFAULT(0);		# 用来记录循环次数
+
+		SELECT AVG(salary) INTO avg_sal FROM employees;
+
+		# LOOP循环
+		loop_lab : LOOP
+				IF avg_sal >= 12000 THEN LEAVE loop_lab;
+				END IF;
+					
+				# 如果不满足条件，则更新表中的薪资
+				UPDATE employees SET salary = salary * 1.1;
+
+				SELECT AVG(salary) INTO avg_sal FROM employees;
+				SET loop_count = loop_count + 1;
+
+		END LOOP;
+
+		SET num = loop_count;
+END //
+DELIMITER ;
+
+# 查询employees表中的平均工资
+SELECT AVG(salary) FROM employees;
+
+CALL update_salary_loop(@num);
+SELECT @num;
+
+
+## 4.4 循环结构之 WHILE
+/*
+		WHILE语句创建一个带条件判断的循环过程。WHILE在执行语句执行时，先对指定的表达式进行判断，如
+		果为真，就执行循环内的语句，否则退出循环。WHILE语句的基本格式如下：
+
+			[while_label: ] WHILE 循环条件  DO
+						循环体
+			END WHILE [while_label];
+
+		while_label为WHILE语句的标注名称；如果循环条件结果为真，WHILE语句内的语句或语句群被执行，直至循环条件为假，退出循环。
+ */
+# 举例1：WHILE语句示例，i值小于10时，将重复执行循环过程，代码如下：
+DELIMITER //
+CREATE PROCEDURE test_while()
+BEGIN
+		DECLARE num INT DEFAULT(0); # 定义变量i
+
+		while_label : WHILE num < 10 DO
+
+						SET num = num + 1;
+
+		END WHILE while_label;
+
+		SELECT num;
+END //
+DELIMITER ;
+
+CALL test_while();
+
+# 举例2：市场环境不好时，公司为了渡过难关，决定暂时降低大家的薪资。声明存储过程
+#			   “update_salary_while()”，声明OUT参数num，输出循环次数。存储过程中实现循环给大家降薪，薪资降
+#				 为原来的90%。直到全公司的平均薪资达到5000结束。并统计循环次数。
+DELIMITER //
+CREATE PROCEDURE update_salary_while(OUT num INT)
+BEGIN
+		DECLARE count INT default 0; # 记录循环次数
+		DECLARE avg_sal DOUBLE;		# 记录平均薪资
+
+		SELECT AVG(salary) INTO avg_sal FROM employees;
+
+		while_label : WHILE avg_sal > 5000 DO
+			
+					UPDATE employees SET salary = salary * 0.9;
+					
+					SELECT AVG(salary) INTO avg_sal FROM employees;
+					
+					SET count = count + 1;
+
+		END WHILE while_label;
+	
+		SET num = count;
+
+END //
+DELIMITER ;
+
+SELECT AVG(salary) FROM employees;
+
+CALL update_salary_while(@num);
+SELECT @num;
+
+## 4.5 循环结构之 REPEAT (类似于do..while循环)
+/*
+		REPEAT语句创建一个带条件判断的循环过程。与WHILE循环不同的是，REPEAT 循环首先会执行一次循
+		环，然后在 UNTIL 中进行表达式的判断，如果满足条件就退出，即 END REPEAT；如果条件不满足，则会
+		就继续执行循环，直到满足退出条件为止。
+
+		REPEAT 循环的语法格式：
+			[repeat_label:] REPEAT
+	　　　　循环体的语句
+			UNTIL 结束循环的条件表达式
+			END REPEAT [repeat_label]
+
+		repeat_label为REPEAT语句的标注名称，该参数可以省略；REPEAT语句内的语句或语句群被重复，直至expr_condition为真。
+ */
+# 举例1：
+DELIMITER //
+CREATE PROCEDURE test_repeat()
+BEGIN
+		DECLARE num INT DEFAULT 0;
+
+		repeat_label: REPEAT
+			 set num = num + 1;
+		UNTIL num >= 10 # note: until 后面没有分号
+		END REPEAT repeat_label;
+
+		SELECT num;
+		
+END //
+DELIMITER ;
+
+CALL test_repeat();
+
+# 举例2：当市场环境变好时，公司为了奖励大家，决定给大家涨工资。声明存储过程
+#				 “update_salary_repeat()”，声明OUT参数num，输出循环次数。存储过程中实现循环给大家涨薪，薪资涨
+# 			 为原来的1.15倍。直到全公司的平均薪资达到13000结束。并统计循环次数。
+DROP PROCEDURE update_salary_repeat;
+
+DELIMITER //
+CREATE PROCEDURE update_salary_repeat(OUT num INT)
+BEGIN
+		DECLARE avg_sal DOUBLE;
+		DECLARE count INT DEFAULT 0;
+
+		SELECT AVG(salary) INTO avg_sal FROM employees;
+
+		repeat_label: REPEAT
+				SET count = count + 1;
+				
+				UPDATE employees SET salary = salary * 1.15;
+
+				SELECT AVG(salary) INTO avg_sal FROM employees;
+
+		UNTIL avg_sal >= 13000
+		END REPEAT repeat_label;
+		
+		SET num = count;
+END //
+DELIMITER ;
+
+CALL update_salary_repeat(@num);
+SELECT @num;
+
+SELECT AVG(salary) FROM employees;
