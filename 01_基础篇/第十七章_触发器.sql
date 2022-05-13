@@ -39,6 +39,19 @@
 				触发器执行的语句块：可以是单条SQL语句，也可以是由BEGIN...END结构组成的复合语句块。
 
 
+		3. 注意点
+
+			注意，如果在子表中定义了外键约束，并且外键指定了ON UPDATE/DELETE CASCADE/SET NULL子句，此
+			时修改父表被引用的键值或删除父表被引用的记录行时，也会引起子表的修改和删除操作，此时基于子
+			表的UPDATE和DELETE语句定义的触发器并不会被激活。
+
+			例如：基于子表员工表（t_employee）的DELETE语句定义了触发器t1，而子表的部门编号（did）字段定
+			义了外键约束引用了父表部门表（t_department）的主键列部门编号（did），并且该外键加了“ON
+			DELETE SET NULL”子句，那么如果此时删除父表部门表（t_department）在子表员工表（t_employee）
+			有匹配记录的部门记录时，会引起子表员工表（t_employee）匹配记录的部门编号（did）修改为NULL，
+			但是此时不会激活触发器t1。
+
+			只有直接对子表员工表（t_employee）执行DELETE语句时才会激活触发器t1。
 
  */
 ## 0. 准备工作，创建本章的数据库dbtest17
