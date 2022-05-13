@@ -151,3 +151,26 @@ VALUES ('TomJJ', 'TomJJ@123.com', CURDATE(), 9900, 103, 'AD_VP', 50);
 
 SELECT * FROM employees; 
 
+# 2. 查看和删除触发器
+/*
+		查看触发器是查看数据库中已经存在的触发器的定义、状态和语法信息等。
+
+		方式1：查看当前数据库的所有触发器的定义
+					 SHOW TRIGGERS\G
+		方式2：查看当前数据库中某个触发器的定义
+					 SHOW CREATE TRIGGER 触发器名
+		方式3：从系统库information_schema的TRIGGERS表中查询salary_check_trigger触发器的信息
+					 SELECT * FROM information_schema.Triggers;
+
+		删除触发器：
+			触发器也是数据库对象，删除触发器也用drop语句：
+			DROP TRIGGER IF EXISTS 触发器名;
+ */ 
+SHOW TRIGGERS;
+
+SHOW CREATE TRIGGER emps_del_trigger;
+
+SELECT * FROM information_schema.TRIGGERS;
+
+DROP TRIGGER salary_check_trigger;
+
