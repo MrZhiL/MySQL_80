@@ -334,7 +334,7 @@ SELECT id, category, NAME, price, pre_price, price - pre_price AS diff_price
 FROM (
 				SELECT id, category, NAME, price, LAG(price, 1) OVER w AS pre_price
 				FROM goods
-				WINDOW w AS (PARTITION BY category_id ORDER BY price)
+				WINDOW w AS (PARTITION BY category_id ORDER BY price) # window w as xxx 相当于是预定义，w = (PARTITION BY category_id ORDER BY price)
 		 ) t;
 
 # 2) LEAD(expr,n)函数: 函数返回当前行的后n行的expr的值。
@@ -366,6 +366,9 @@ SELECT id, category, NAME, price, NTH_VALUE(price, 2) OVER w AS second_price,
 NTH_VALUE(price, 3) OVER w AS third_price
 FROM goods WINDOW w AS (PARTITION BY category_id ORDER BY price);
 
+SELECT id, category, NAME, price, NTH_VALUE(price, 2) OVER (PARTITION BY category_id ORDER BY price) AS second_price,
+NTH_VALUE(price, 3) OVER (PARTITION BY category_id ORDER BY price) AS third_price
+FROM goods;
 
 SELECT * FROM (
 									SELECT RANK() OVER(PARTITION BY category_id ORDER BY price DESC) AS row_num,
@@ -382,28 +385,137 @@ FROM goods WINDOW w AS (PARTITION BY category_id ORDER BY price);
 
 
 
-# 
+##
 CREATE TABLE employees
 AS
 SELECT * FROM dbtest2.employees;
 
-SELECT * FROM employees;
+SELECT * FROM (
+								SELECT employee_id, last_name, email, salary FROM employees where department_id = 
+										(SELECT department_id FROM employees WHERE employee_id = 185)
+							) t;
 
 # 查询employees表中的数据，先按照部门id降序，然后按照salary升序
 SELECT * FROM employees
 ORDER BY department_id DESC, salary;
 
 
+## 3. 新特性2： 公用表表达式
+/* 
+	公用表表达式（或通用表表达式）简称为CTE(Common Table Expressions)。CTE是一个命名的临时结果集，
+	作用范围时当前语句。CTE可以理解成一个可以复用的子查询，当然跟子查询还是有点区别的，CTE可以引用
+	其他CTE，但子查询不能引用其他子查询。所以，可以考虑替代子查询。
 
 
+	依据语法结构和执行方式的不同，共用表表达式分为 普通公用表表达式 和 递归公用表表达式 2种
+
+	3.1 普通公用表表达式：
+		WITH CTE名称
+		AS (子查询)
+		SELECT | DELETE | UPDATE 语句;
+
+		普通公用表表达式类似于子查询，不过，和子查询不同的是，它可以被多次引用，而且可以被其他的普通公用表表达式所引用。
+
+	3.2 递归公用表表达式
+		递归公用表表达式也是一种公用表表达式，只不过，除了普通公用表表达式的特点以为，它还有自己的特点，
+		就是可以调用自己。
+
+		WITH RECURSIVE 
+		CTE名称 AS (子查询)
+		SELECT | DELETE | UPDATE 语句;
+
+		递归公用表表达式由 2 部分组成，分别是种子查询和递归查询，中间通过关键字 UNION [ALL]进行连接。
+		这里的种子查询，意思就是获得递归的初始值。这个查询只会运行一次，以创建初始数据集，之后递归
+		查询会一直执行，直到没有任何新的查询数据产生，递归返回。
+
+ */
+# 1) 普通公用表表达式
+# 准备工作
+CREATE TABLE departments
+AS
+SELECT * FROM dbtest2.departments;
+
+# 举例：查询员工所在部门的详细信息
+# 如果不使用公用表表达式，则需要使用以下语法：
+SELECT * FROM departments
+WHERE department_id IN (
+													SELECT DISTINCT department_id FROM employees
+											 );
+
+# 使用公用表表达式
+WITH cte_emp
+AS (SELECT DISTINCT department_id FROM employees)
+SELECT * FROM departments d JOIN cte_emp e 
+USING (department_id);
 
 
+WITH emp_dept_id
+AS (SELECT DISTINCT department_id FROM employees)
+SELECT *
+FROM departments d JOIN emp_dept_id e
+ON d.department_id = e.department_id;
 
 
+# 2) 递归公用表表达式
+# 递归公用表表达式由 2 部分组成，分别是种子查询和递归查询，中间通过关键字 UNION [ALL]进行连接。
+#	这里的种子查询，意思就是获得递归的初始值。这个查询只会运行一次，以创建初始数据集，之后递归
+# 查询会一直执行，直到没有任何新的查询数据产生，递归返回。
+
+# 案例：针对于我们常用的employees表，包含employee_id，last_name和manager_id三个字段。如果a是b
+#			  的管理者，那么，我们可以把b叫做a的下属，如果同时b又是c的管理者，那么c就是b的下属，是a的下下属。
+/*
+		下面我们尝试用查询语句列出所有具有下下属身份的人员信息。
+		如果用我们之前学过的知识来解决，会比较复杂，至少要进行 4 次查询才能搞定：
+
+			第一步，先找出初代管理者，就是不以任何别人为管理者的人，把结果存入临时表；
+			第二步，找出所有以初代管理者为管理者的人，得到一个下属集，把结果存入临时表；
+			第三步，找出所有以下属为管理者的人，得到一个下下属集，把结果存入临时表。
+			第四步，找出所有以下下属为管理者的人，得到一个结果集。
+
+		如果第四步的结果集为空，则计算结束，第三步的结果集就是我们需要的下下属集了，否则就必须继续
+		进行第四步，一直到结果集为空为止。比如上面的这个数据表，就需要到第五步，才能得到空结果集。
+		而且，最后还要进行第六步：把第三步和第四步的结果集合并，这样才能最终获得我们需要的结果集。
+
+		如果用递归公用表表达式，就非常简单了。我介绍下具体的思路。
+
+			* 用递归公用表表达式中的种子查询，找出初代管理者。字段 n 表示代次，初始值为 1，表示是第一代管理者。
+			* 用递归公用表表达式中的递归查询，查出以这个递归公用表表达式中的人为管理者的人，并且代次的值加 1。
+				直到没有人以这个递归公用表表达式中的人为管理者了，递归返回。
+			* 在最后的查询中，选出所有代次大于等于 3 的人，他们肯定是第三代及以上代次的下属了，也就是下下属了。
+				这样就得到了我们需要的结果集。
+
+		这里看似也是 3 步，实际上是一个查询的 3 个部分，只需要执行一次就可以了。而且也不需要用临时表
+		保存中间结果，比刚刚的方法简单多了。
+ */
+WITH RECURSIVE cte
+AS
+(
+	SELECT employee_id, last_name, manager_id, 1 AS n FROM employees WHERE employee_id = 100 -- 种子查询，找出第一代领导
+	UNION ALL
+	SELECT a.employee_id, a.last_name, a.manager_id, n+1 FROM employees AS a JOIN cte
+	ON a.manager_id = cte.employee_id -- 递归查询，找出以递归公用表表达式的人为领导的人
+)
+SELECT employee_id, last_name FROM cte WHERE n >= 3;
 
 
+# 使用普通查询
+# 创建临时表，查询第一代和第二代领导
+drop TEMPORARY TABLE manager1;
+CREATE TEMPORARY TABLE manager1 
+AS
+SELECT employee_id FROM employees 
+WHERE employee_id IN (
+												SELECT DISTINCT employee_id FROM employees WHERE manager_id = 100 OR employee_id = 100
+											);
+
+SELECT * FROM manager1; # 15条记录
+
+SELECT employee_id, last_name
+FROM employees 
+WHERE employee_id NOT IN (
+		SELECT DISTINCT employee_id FROM employees WHERE manager_id = 100 OR employee_id = 100
+);
 
 
-
-
+# 或者使用for循环
 
